@@ -20,11 +20,12 @@ to pass by referenceNULL in C becomes None in Python
 """
 
 class CallbackTask(Task):
-    def __init__(self):
-        Task.__init__(self)
-        self.data = np.zeros(1000)
-        self.a = []
-        self.CreateAIVoltageChan(
+	def __init__(self, write_end):
+		Task.__init__(self)
+		self.write_end = write_end #transport pipe to other process
+		self.data = np.zeros(1000)
+		self.a = []
+		self.CreateAIVoltageChan(
 			"myDAQ1/ai0", #The name of the physical channel muDAQ1/aiN  (n= 0 or 1)
 			"", #name to assign to virt channel mapped to phys channel above
 			DAQmx_Val_Cfg_Default, #measurement technique used
@@ -32,19 +33,19 @@ class CallbackTask(Task):
 			10.0, #max value expected to measure
 			DAQmx_Val_Volts, #scale for above units
 			None) #name of custom scale if used
-        self.CfgSampClkTiming(
+		self.CfgSampClkTiming(
 			"", #source terimal of Sample clock ("" means onboard clock)
-			10000.0, #sample rate (units: samples/second/channel)
+			20000.0, #sample rate (units: samples/second/channel)
 			DAQmx_Val_Rising, #aquire on rising edge of sample clock
 			DAQmx_Val_ContSamps, #aquire continues until task stopped
 			1000) #numb to aquire if finitSamps
-        self.AutoRegisterEveryNSamplesEvent(
+		self.AutoRegisterEveryNSamplesEvent(
 			DAQmx_Val_Acquired_Into_Buffer, #when the event (callback task) happens
 			1000,0) #number of samples after which event should occur
-        self.AutoRegisterDoneEvent(0)
-    def EveryNCallback(self):
-        read = int32()
-        self.ReadAnalogF64(
+		self.AutoRegisterDoneEvent(0)
+	def EveryNCallback(self):
+		read = int32()
+		self.ReadAnalogF64(
 			1000, #number of samples to read
 			10.0, #timeout in seconds
 			DAQmx_Val_GroupByChannel, #read entire channel in one go
@@ -52,18 +53,35 @@ class CallbackTask(Task):
 			1000, #number of samples 
 			byref(read), #reference where to store: numb of samples read
 			None)
-        self.a.extend(self.data.tolist())
-        print(self.data[0])
-        return 0 # The function should return an integer
-    def DoneCallback(self, status):
-        print("Status"),status.value
-        return 0 # The function should return an integer
+		self.a.extend(self.data.tolist())
+		#print(self.data[0])
+		#print("data RDY")
+		self.write_end.send(self.data)
+		return 0 # The function should return an integer
+	def DoneCallback(self, status):
+		print("Status"),status.value
+		return 0 # The function should return an integer
 
+def startCallBack(write_end, stop):
+	print("starting stuff")
+	task=CallbackTask(write_end)
+	task.StartTask()
 
-task=CallbackTask()
-task.StartTask()
+	stop.wait()
+	print("shutting down myDAQ\n")
 
-input('Acquiring samples continuously. Press Enter to interrupt\n')
+	task.StopTask()
+	task.ClearTask()
 
-task.StopTask()
-task.ClearTask()
+if __name__ == "__main__":
+	write_end, read_end = mp.Pipe()
+	startCallBack(write_end)
+	#input('Acquiring samples continuously. Press Enter to interrupt\n')
+	
+	# task=CallbackTask(write_end)
+	# task.StartTask()
+
+	# input('Acquiring samples continuously. Press Enter to interrupt\n')
+
+	# task.StopTask()
+	# task.ClearTask()
