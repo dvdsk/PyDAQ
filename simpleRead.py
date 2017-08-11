@@ -19,30 +19,35 @@ as they will be automatically converted by ctypes
 to pass by referenceNULL in C becomes None in Python
 """
 
-class CallbackTask(Task):
+class ReadCallbackTask(Task):
 	def __init__(self, write_end):
 		Task.__init__(self)
 		self.write_end = write_end #transport pipe to other process
 		self.data = np.zeros(1000)
 		self.a = []
+		
+		#configurate input channel, where we read the ouput from the myDAQ
 		self.CreateAIVoltageChan(
 			"myDAQ1/ai0", #The name of the physical channel muDAQ1/aiN  (n= 0 or 1)
 			"", #name to assign to virt channel mapped to phys channel above
 			DAQmx_Val_Cfg_Default, #measurement technique used
 			-10.0, #min value expected to measure
 			10.0, #max value expected to measure
-			DAQmx_Val_Volts, #scale for above units
+			DAQmx_Val_Volts, #units for min val and max val
 			None) #name of custom scale if used
+
+		#configurate timing and sample rate for the samples
 		self.CfgSampClkTiming(
 			"", #source terimal of Sample clock ("" means onboard clock)
 			20000.0, #sample rate (units: samples/second/channel)
 			DAQmx_Val_Rising, #aquire on rising edge of sample clock
 			DAQmx_Val_ContSamps, #aquire continues until task stopped
-			1000) #numb to aquire if finitSamps
+			1000) #numb to aquire if finitSamps/ bufferSize if contSamps (bufsize in this case)
 		self.AutoRegisterEveryNSamplesEvent(
-			DAQmx_Val_Acquired_Into_Buffer, #when the event (callback task) happens
+			DAQmx_Val_Acquired_Into_Buffer, #the event on which the callback task starts
 			1000,0) #number of samples after which event should occur
 		self.AutoRegisterDoneEvent(0)
+		
 	def EveryNCallback(self):
 		read = int32()
 		self.ReadAnalogF64(
@@ -62,16 +67,26 @@ class CallbackTask(Task):
 		print("Status"),status.value
 		return 0 # The function should return an integer
 
-def startCallBack(write_end, stop):
-	print("starting stuff")
-	task=CallbackTask(write_end)
-	task.StartTask()
 
+
+
+
+
+def startCallBack(write_end, stop, outputShape):
+	print("starting stuff")
+	# readInTask=ReadCallbackTask(write_end)
+	writeInTask=WriteCallbackTask(outputShape)
+	
+	# readInTask.StartTask()
+	writeInTask.StartTask()
+	
 	stop.wait()
 	print("shutting down myDAQ\n")
 
-	task.StopTask()
-	task.ClearTask()
+	# readInTask.StopTask()
+	writeInTask.StopTask()
+	# readInTask.ClearTask()
+	writeInTask.ClearTask()
 
 if __name__ == "__main__":
 	write_end, read_end = mp.Pipe()
