@@ -27,29 +27,8 @@ class WriteCallbackTask(Task):
 			DAQmx_Val_Rising, #generage on rising edge of sample clock
 			DAQmx_Val_ContSamps, #generate continues until task stopped
 			1000) #numb to generate if finitSamps/ bufferSize if contSamps (bufsize in this case)
-		# self.AutoRegisterEveryNSamplesEvent(
-			# DAQmx_Val_Transferred_From_Buffer, #the event on which the callback task starts
-			# 1000,0) #number of samples generated after which event should occur
-		# self.AutoRegisterDoneEvent(0)
 		
 		self.WriteAnalogF64(100, 0, DAQmx_Val_WaitInfinitely, DAQmx_Val_GroupByChannel, self.outputData, byref(self.sampswritten), None);
-		
-		
-	# def EveryNCallback(self):
-		# self.WriteAnalogF64(
-			# 1000, #number of samples to write
-			# 0, #autostart
-			# 10.0, #timeout in seconds
-			# DAQmx_Val_GroupByChannel, #read entire channel in one go
-			# self.outputData, #array where the samples should be put in
-			# byref(self.sampswritten),
-			# None)
-		# self.a.extend(self.data.tolist())
-		# return 0 # The function should return an integer
-
-	def DoneCallback(self, status):
-		print("Status"),status.value
-		return 0 # The function should return an integer
 
 if __name__ == "__main__":
 	outputShape = np.sin(np.linspace(0, np.pi, num =100, endpoint=False))
