@@ -39,9 +39,9 @@ def testPipes(read_end, stop, outputShape):
 	canvas = ax.figure.canvas
 	while(not stop.is_set() and not read_end.poll(0.1)):
 		continue
-		
+	data = read_end.recv()
 	##############INIT PLOT#####################
-	buffer.append(1)
+	buffer.append(np.mean(data))
 	x = np.linspace(0, 10000, num=10000)
 	fig = plt.figure()
 	ax = fig.add_subplot(1, 1, 1)
@@ -60,8 +60,7 @@ def testPipes(read_end, stop, outputShape):
 	while(not stop.is_set()):
 		if(read_end.poll()):
 			data = read_end.recv()
-			print("appending")
-			buffer.append(1+i)
+			buffer.append(np.mean(data))
 			i+=1
 			line.set_ydata(buffer)
 			line.set_xdata(x[:len(buffer)])
