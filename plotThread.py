@@ -41,7 +41,8 @@ def testPipes(read_end, stop, outputShape):
 		continue
 	data = read_end.recv()
 	##############INIT PLOT#####################
-	buffer.append(np.mean(data))
+	#buffer.append(np.mean(data))
+	buffer.append(data.mean())
 	x = np.linspace(0, 10000, num=10000)
 	fig = plt.figure()
 	ax = fig.add_subplot(1, 1, 1)
@@ -49,21 +50,21 @@ def testPipes(read_end, stop, outputShape):
 	fig.canvas.draw()   # note that the first draw comes before setting data 
 
 	line, = ax.plot(x[:len(buffer)], lw=3)
+	line.set_ydata(buffer)
 
 	# cache the background
 	axbackground = fig.canvas.copy_from_bbox(ax.bbox)
 	##############DONE INIT PLOT#####################
-	i = 0
 	print("now in forever loopy loopy without break")
-	print("len buffer: ",len(buffer),"len xdata: ",len(x[:len(buffer)]))
-	
 	while(not stop.is_set()):
 		if(read_end.poll()):
 			data = read_end.recv()
-			buffer.append(np.mean(data))
-			i+=1
+			buffer.append(data.mean())
 			line.set_ydata(buffer)
 			line.set_xdata(x[:len(buffer)])
+
+			print("len buffer: ", len(buffer), "len x: ",len(x[:len(buffer)]))
+			print(buffer)
 			
 			# recompute the ax.dataLim
 			ax.relim()
