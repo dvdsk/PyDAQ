@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib
 #matplotlib.use('GTKAgg')
 from matplotlib import pyplot as plt
+from collections import deque
 
 # class Plot:
 	# def __init__(self, x, y):
@@ -29,36 +30,46 @@ from matplotlib import pyplot as plt
 	# def __exit__(self):
 		# plt.close(self.fig)
 
+ 
+		
 def testPipes(read_end, stop, outputShape):
+	buffer = deque(maxlen=10000) 
+	print(buffer)
 	ax = plt.subplot()
 	canvas = ax.figure.canvas
 	while(not stop.is_set() and not read_end.poll(0.1)):
 		continue
 		
 	##############INIT PLOT#####################
-	k=0.
-	x = np.linspace(0,50., num=10000)
+	buffer.append(1)
+	x = np.linspace(0, 10000, num=10000)
 	fig = plt.figure()
 	ax = fig.add_subplot(1, 1, 1)
 
 	fig.canvas.draw()   # note that the first draw comes before setting data 
 
-	line, = ax.plot(x, lw=3)
-	ax.set_ylim([-1,1])
-
+	line, = ax.plot(x[:len(buffer)], lw=3)
 
 	# cache the background
 	axbackground = fig.canvas.copy_from_bbox(ax.bbox)
 	##############DONE INIT PLOT#####################
-	
+	i = 0
 	print("now in forever loopy loopy without break")
+	print("len buffer: ",len(buffer),"len xdata: ",len(x[:len(buffer)]))
+	
 	while(not stop.is_set()):
 		if(read_end.poll()):
 			data = read_end.recv()
+			print("appending")
+			buffer.append(1+i)
+			i+=1
+			line.set_ydata(buffer)
+			line.set_xdata(x[:len(buffer)])
 			
-		line.set_ydata(np.sin(x/3.+k))
-		#print tx
-		k+=0.11
+			# recompute the ax.dataLim
+			ax.relim()
+			# update ax.viewLim using the new dataLim
+			ax.autoscale_view()
 
 		# restore background
 		fig.canvas.restore_region(axbackground)
