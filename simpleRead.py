@@ -23,7 +23,7 @@ class ReadCallbackTask(Task):
 	def __init__(self, write_end):
 		Task.__init__(self)
 		self.write_end = write_end #transport pipe to other process
-		self.data = np.zeros(200)
+		self.data = np.empty(2000)
 		self.a = []
 		
 		#configurate input channel, where we read the ouput from the myDAQ
@@ -39,28 +39,27 @@ class ReadCallbackTask(Task):
 		#configurate timing and sample rate for the samples
 		self.CfgSampClkTiming(
 			"", #source terimal of Sample clock ("" means onboard clock)
-			200.0, #sample rate (units: samples/second/channel)
+			2000.0, #sample rate (units: samples/second/channel)
 			DAQmx_Val_Rising, #aquire on rising edge of sample clock
 			DAQmx_Val_ContSamps, #aquire continues until task stopped
-			200) #numb to aquire if finitSamps/ bufferSize if contSamps (bufsize in this case)
+			2000) #numb to aquire if finitSamps/ bufferSize if contSamps (bufsize in this case)
 		self.AutoRegisterEveryNSamplesEvent(
 			DAQmx_Val_Acquired_Into_Buffer, #the event on which the callback task starts
-			200,0) #number of samples after which event should occur
+			2000,0) #number of samples after which event should occur
 		self.AutoRegisterDoneEvent(0)
 		
 	def EveryNCallback(self):
 		read = int32()
 		self.ReadAnalogF64(
-			200, #number of samples to read
+			2000, #number of samples to read
 			10.0, #timeout in seconds
 			DAQmx_Val_GroupByChannel, #read entire channel in one go
 			self.data, #array where the samples should be put in
-			200, #number of samples 
+			2000, #number of samples 
 			byref(read), #reference where to store: numb of samples read
 			None)
 		self.a.extend(self.data.tolist())
 		#print(self.data[0])
-		#print("data RDY")
 		self.write_end.send(self.data)
 		return 0 # The function should return an integer
 	def DoneCallback(self, status):
