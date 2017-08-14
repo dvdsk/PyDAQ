@@ -7,31 +7,42 @@ from collections import deque
 import numpy as np
 
 class circularNumpyBuffer:
-	
-	def __init__(self, capacity, dtype=float):
-		self.arr = np.empty(capacity*10, dtype)
+	"""A numpy implementation of a circular buffer, a circular buffer can append data forever
+	   but starts overwriting old data after its capacity is reached. It thus only remembers the
+	   last data. This simple implementation has no check on the appending data, make sure
+	   it is not larger then the capacity of this buffer. It is only capable of appending numpy arrays
+	   not other data.
+	"""
+	def __init__(self, capacity, dtype=np.float64):
+		#internal buffer is 10x larger to minimise the amount of move operations needed
 		self.arrLen = capacity*10
+		self.arr = np.empty(self.arrLen, dtype)
+
+		#indexes used to keep track of where the current data is
 		self.left_index = 0
 		self.right_index = 0
 		self.capacity = capacity
 	def append(self,sample):
+		#check if we have enough space left in the array
 		if(self.right_index+len(sample)<self.arrLen):
-			#enough space left for the sample in the buffer
+			#copy the new data into the array
 			usedCapacity = self.right_index-self.left_index
 			self.arr[self.right_index : self.right_index+len(sample)] = sample
+			#check if we are at capacity and need to 'forget' some data by shifting the left index
 			if(usedCapacity + len(sample) > self.capacity):
-				#time to start 'wiping data' to prevent buffer from growing to large
 				self.left_index += np.size(sample)
 			self.right_index += np.size(sample)
 		else:
-			#if out of space copy all still usefull data to the beginning
+			#start by forgetting the data we no longer need
 			newLeft = self.left_index+np.size(sample)
-			print("len:",self.right_index-newLeft)
+			#copy the data from the end of the array to the start so we have enough space again
 			self.arr[0:(self.right_index - newLeft)] = self.arr[newLeft:self.right_index]
-			#update index
+			#update indexes reflecting we now start at the beginning of the array
 			self.right_index = self.right_index - newLeft
 			self.left_index = 0
-			#store sample
+			#store sample and update right index 
+			#left index does not need updating as we started by updating left/forgetting some data
+			#and took this into account when moving data back to the the start of the array
 			self.arr[self.right_index : np.size(sample)] = sample
 			self.right_index += np.size(sample)
 	def acces(self):
@@ -41,10 +52,13 @@ class circularNumpyBuffer:
 	def __len__(self):
 		return self.right_index-self.left_index
 
+sampleSize=2000
+bufferLen=100000
 
 def testPipes(read_end, stop, outputShape):
 	sampleSize=2000
-	buffer = circularNumpyBuffer(100000, np.float64)
+	x = np.linspace(0, bufferLen, num=bufferLen)
+	buffer = circularNumpyBuffer(bufferLen, np.float64)
 	ax = plt.subplot()
 	canvas = ax.figure.canvas
 	while(not stop.is_set() and not read_end.poll(0.1)):
@@ -52,8 +66,6 @@ def testPipes(read_end, stop, outputShape):
 	data = read_end.recv()
 	##############INIT PLOT#####################
 	buffer.append(data)
-	print(buffer.acces())
-	x = np.linspace(0, 100000, num=100000)
 	fig = plt.figure()
 	ax = fig.add_subplot(1, 1, 1)
 
@@ -63,16 +75,12 @@ def testPipes(read_end, stop, outputShape):
 	# cache the background
 	axbackground = fig.canvas.copy_from_bbox(ax.bbox)
 	##############DONE INIT PLOT#####################
-	print("now in forever loopy loopy without break")
 	while(not stop.is_set()):
 		if(read_end.poll()):
 			data = read_end.recv()
 			buffer.append(data)
 			line.set_ydata(buffer.acces())
 			line.set_xdata(x[:len(buffer)])
-
-			print("len buffer: ", len(buffer), "len x: ",len(x[:len(buffer)]))
-			print(buffer)
 			
 			# recompute the ax.dataLim
 			ax.relim()
