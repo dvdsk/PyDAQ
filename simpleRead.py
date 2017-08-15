@@ -66,7 +66,7 @@ class ReadCallbackTask(Task):
 		print("Status"),status.value
 		return 0 # The function should return an integer
 
-class WriteCallbackTask(Task):
+class WriteTask(Task):
 	def __init__(self, outputData):
 		Task.__init__(self)
 		self.outputData = outputData
@@ -89,13 +89,20 @@ class WriteCallbackTask(Task):
 			DAQmx_Val_Rising, #generage on rising edge of sample clock
 			DAQmx_Val_ContSamps, #generate continues until task stopped
 			200) #numb to generate if finitSamps/ bufferSize if contSamps (bufsize in this case)
-		
-		self.WriteAnalogF64(200, 0, DAQmx_Val_WaitInfinitely, DAQmx_Val_GroupByChannel, self.outputData, byref(self.sampswritten), None);
+		self.WriteAnalogF64(
+			200, #number of samples to write
+			False, #start output automatically
+			DAQmx_Val_WaitInfinitely, #timeout to wait for funct to write samples 
+			DAQmx_Val_GroupByChannel, #read entire channel in one go
+			self.outputData, #source array from which to write the data
+			byref(self.sampswritten), #variable to store the numb of written samps in
+			None)
+
 
 def startCallBack(write_end, stop, outputShape):
 	print("starting stuff")
 	readInTask=ReadCallbackTask(write_end)
-	writeInTask=WriteCallbackTask(outputShape)
+	writeInTask=WriteTask(outputShape)
 	
 	readInTask.StartTask()
 	writeInTask.StartTask()
