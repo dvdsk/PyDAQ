@@ -39,7 +39,7 @@ if __name__ == "__main__":
 	
 	time.sleep(5)
 	
-	outputShape = np.sin(np.linspace(0, np.pi, num =200, endpoint=False, dtype=np.double))
+	outputShape = np.linspace(5,5, num =200, endpoint=False, dtype=np.double)
 	output_write_end.send(outputShape)
 	
 	input('Acquiring samples continuously. Press Enter to interrupt\n')

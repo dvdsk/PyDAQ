@@ -137,16 +137,22 @@ def startCallBack(input_write_end, output_read_end, stop, outputShape):
 	#every second check if the output should change
 	while(not stop.wait(1)):
 		if(output_read_end.poll()):
+			print("updating output waveform")
 			sampswritten = int32()
 			outputData = output_read_end.recv()
+			print(outputData)
+			# try:
+			writeInTask.StopTask()
 			writeInTask.WriteAnalogF64(
 				200, #number of samples to write
-				False, #start output automatically
+				True, #start output automatically
 				DAQmx_Val_WaitInfinitely, #timeout to wait for funct to write samples 
 				DAQmx_Val_GroupByChannel, #read entire channel in one go
 				outputData, #source array from which to write the data
 				byref(sampswritten), #variable to store the numb of written samps in
 				None)
+			# except DAQError: #cache warning that data might change mid buffer (no idea when new input starts affecting output)
+				# continue
 	print("shutting down myDAQ\n")
 
 	readInTask.StopTask()
