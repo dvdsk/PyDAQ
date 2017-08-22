@@ -60,4 +60,3 @@ def testPipes(read_end, stop, outputShape):
 		#however with Qt4 (and TkAgg??) this is needed. It seems,using a different backend, 
 		#one can avoid plt.pause() and gain even more speed.
 		
-	print("testPipes rdy to join")

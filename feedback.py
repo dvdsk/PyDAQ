@@ -59,7 +59,8 @@ class WriteTask(Task):
 		#not configuring sample timing -> driver in on demand sample for anolog out
 
 
-def feedback(write_end, stop):
+def feedback(write_end, stop, rdy):
+	print("started feedback")
 	buffer = circularNumpyBuffer(10000, dtype=np.float64) #TODO expose to user (len)
 	data = np.empty(100, dtype=np.float64)
 	sampsWritten = int32()
@@ -67,15 +68,16 @@ def feedback(write_end, stop):
 	
 	sendbuf = np.empty(2000)
 	start_idx = 0
-	
+
+	t0 = time.time()
 	writeTask = WriteTask()
 	readTask = ReadTask()
-	t1 = t0 = 0
 	
 	feedbackSig = np.array([1], dtype=np.float64)#H(buffer.access)
 	n= 0
-	while(True):
-		t0 = t1
+	rdy.set()
+	while(not stop.wait(0)):
+		t0
 		t1 = time.time()
 		print("latency:",t1-t0)
 		readTask.ReadAnalogF64(
@@ -108,10 +110,4 @@ def feedback(write_end, stop):
 			feedbackSig, #source array from which to write the data
 			byref(sampsWritten),  #variable to store the numb of written samps in
 			None)
-	
-	
-	
-
-
-if __name__ == "__main__":
-	Feedback()
+		t0 = t1

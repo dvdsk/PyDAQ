@@ -141,7 +141,6 @@ def startCallBack(input_write_end, output_read_end, stop, outputShape):
 			sampswritten = int32()
 			outputData = output_read_end.recv()
 			print(outputData)
-			# try:
 			writeInTask.StopTask()
 			writeInTask.WriteAnalogF64(
 				200, #number of samples to write
@@ -151,25 +150,9 @@ def startCallBack(input_write_end, output_read_end, stop, outputShape):
 				outputData, #source array from which to write the data
 				byref(sampswritten), #variable to store the numb of written samps in
 				None)
-			# except DAQError: #cache warning that data might change mid buffer (no idea when new input starts affecting output)
-				# continue
-	print("shutting down myDAQ\n")
-
+	#shutdown routine
 	readInTask.StopTask()
 	writeInTask.StopTask()
 	readInTask.ClearTask()
 	writeInTask.ClearTask()
-	print("startCallBack rdy to join")
-
-if __name__ == "__main__":
-	write_end, read_end = mp.Pipe()
-	startCallBack(write_end)
-	#input('Acquiring samples continuously. Press Enter to interrupt\n')
-	
-	# task=CallbackTask(write_end)
-	# task.StartTask()
-
-	# input('Acquiring samples continuously. Press Enter to interrupt\n')
-
-	# task.StopTask()
-	# task.ClearTask()
+	print("myDAQ shut down succesfully\n")
