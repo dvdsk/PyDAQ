@@ -10,7 +10,7 @@ from circBuff import circularNumpyBuffer
 sampleSize=2000
 bufferLen=100000
 
-def testPipes(read_end, stop, outputShape):
+def testPipes(read_end, stop, outputShape, rdy):
 	sampleSize=2000
 	x = np.linspace(0, bufferLen, num=bufferLen)
 	buffer = circularNumpyBuffer(bufferLen, np.float64)
@@ -26,15 +26,16 @@ def testPipes(read_end, stop, outputShape):
 
 	fig.canvas.draw()   # note that the first draw comes before setting data 
 
-	line, = ax.plot(buffer.acces(), x[:len(buffer)])
+	line, = ax.plot(buffer.access(), x[:len(buffer)])
 	# cache the background
 	axbackground = fig.canvas.copy_from_bbox(ax.bbox)
+	rdy.set()
 	##############DONE INIT PLOT#####################
 	while(not stop.is_set()):
 		if(read_end.poll()):
 			data = read_end.recv()
 			buffer.append(data)
-			line.set_ydata(buffer.acces())
+			line.set_ydata(buffer.access())
 			line.set_xdata(x[:len(buffer)])
 			
 			# recompute the ax.dataLim

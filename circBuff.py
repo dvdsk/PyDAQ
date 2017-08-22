@@ -39,7 +39,7 @@ class circularNumpyBuffer:
 			#and took this into account when moving data back to the the start of the array
 			self.arr[self.right_index : self.right_index+len(sample)] = sample
 			self.right_index += len(sample)
-	def acces(self):
+	def access(self):
 		#print(self.left_index)
 		#print(self.right_index)
 		return self.arr[self.left_index : self.right_index]

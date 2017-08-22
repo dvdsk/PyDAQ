@@ -150,7 +150,19 @@ def startCallBack(input_write_end, output_read_end, stop, outputShape):
 				outputData, #source array from which to write the data
 				byref(sampswritten), #variable to store the numb of written samps in
 				None)
+	
 	#shutdown routine
+	#start by setting the output signal to zero
+	writeInTask.StopTask()
+	writeInTask.WriteAnalogF64(
+		1, #number of samples to write
+		True, #start output automatically
+		1, #timeout to wait for funct to write samples 
+		DAQmx_Val_GroupByChannel, #read entire channel in one go
+		np.array([0]), #source array from which to write the data
+		byref(sampswritten),  #variable to store the numb of written samps in
+		None)
+	
 	readInTask.StopTask()
 	writeInTask.StopTask()
 	readInTask.ClearTask()
