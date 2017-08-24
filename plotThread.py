@@ -10,7 +10,7 @@ from circBuff import circularNumpyBuffer
 sampleSize=2000
 bufferLen=100000
 
-def testPipes(read_end, stop, outputShape, rdy):
+def plot(read_end, stop, rdy):
 	sampleSize=2000
 	x = np.linspace(0, bufferLen, num=bufferLen)
 	buffer = circularNumpyBuffer(bufferLen, np.float64)

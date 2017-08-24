@@ -125,20 +125,21 @@ class WriteTask(Task):
 
 
 def startCallBack(input_write_end, output_read_end, stop, outputShape):
-	readInTask=ReadCallbackTask(input_write_end)
+	sampswritten = int32()
+	
+	readInTask= ReadCallbackTask(input_write_end)
 	writeInTask=WriteTask(outputShape)
 	if(readInTask.rdy == False or writeInTask.rdy == False):
 		print("errors detected, not starting readout!!")
 		return 
-	
+
 	readInTask.StartTask()
 	writeInTask.StartTask()
-	
+
 	#every second check if the output should change
 	while(not stop.wait(1)):
 		if(output_read_end.poll()):
 			print("updating output waveform")
-			sampswritten = int32()
 			outputData = output_read_end.recv()
 			print(outputData)
 			writeInTask.StopTask()
@@ -150,19 +151,19 @@ def startCallBack(input_write_end, output_read_end, stop, outputShape):
 				outputData, #source array from which to write the data
 				byref(sampswritten), #variable to store the numb of written samps in
 				None)
-	
+
 	#shutdown routine
 	#start by setting the output signal to zero
 	writeInTask.StopTask()
 	writeInTask.WriteAnalogF64(
-		1, #number of samples to write
+		2, #number of samples to write
 		True, #start output automatically
 		1, #timeout to wait for funct to write samples 
 		DAQmx_Val_GroupByChannel, #read entire channel in one go
-		np.array([0]), #source array from which to write the data
+		np.array([0,0], dtype=np.float64), #source array from which to write the data
 		byref(sampswritten),  #variable to store the numb of written samps in
 		None)
-	
+
 	readInTask.StopTask()
 	writeInTask.StopTask()
 	readInTask.ClearTask()
