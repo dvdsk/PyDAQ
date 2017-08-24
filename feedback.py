@@ -8,7 +8,7 @@ import numpy as np
 from circBuff import circularNumpyBuffer
 import time
 
-from main import transferFunct
+# from main import transferFunct
 
 """
 See documentation at: http://zone.ni.com/reference/en-XX/help/370471AA-01/
@@ -75,8 +75,7 @@ class WriteTask(Task):
 		#not configuring sample timing -> driver in on demand sample for anolog out
 
 
-def feedback(write_end, stop):
-	print("started feedback")
+def feedback(write_end, stop, transferFunct):
 	buffer = circularNumpyBuffer(10000, dtype=np.float64) #TODO expose to user (len)
 	data = np.empty(100, dtype=np.float64)
 	sampsWritten = int32()

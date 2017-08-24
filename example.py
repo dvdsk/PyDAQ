@@ -1,5 +1,4 @@
 import pyMyDAQ as pd
-
 import numpy as np
 
 
@@ -16,12 +15,12 @@ def transferFunct(buffer, feedbackSig):
 	print("feedbackSig:",feedbackSig)
 	return feedbackSig
 
-outputShape = np.sin(np.linspace(0, 2*np.pi, num =200, endpoint=False, dtype=np.double))
+outputShape = np.sin(np.linspace(0, 2*np.pi, num =200, endpoint=False, dtype=np.float64))
 
 if __name__ == '__main__':
 	pd = pd.PyDAQ()
 	pd.plot()
-	# # pd.Feedback()
+	# pd.Feedback(transferFunct)
 	pd.aquisition(outputShape)
 
 	pd.begin()

@@ -1,5 +1,7 @@
 """MAIN FILE"""
 import multiprocessing as mp
+import numpy as np
+import sys
 
 import simpleRead
 import feedback
@@ -17,9 +19,28 @@ as they will be automatically converted by ctypes
 to pass by referenceNULL in C becomes None in Python
 """
 
+def testProcess(cv):
+	cv.set()
+	return
+
+def testIfName():
+	cv = mp.Event()
+	tp = mp.Process(target=testProcess, args = (cv,))
+	try:
+		tp.start()
+	except RuntimeError as e:
+		print("CRITICAL ERROR: you forgot to nest your code in: \"'if __name__ == '__main__':\"")
+		print("this would cause a crash later in this module")
+	else:
+		tp.join()
+	if(not cv.is_set()):
+		sys.exit()
+
 class PyDAQ:
 	"""description"""
 	def __init__(self):
+		testIfName()
+		
 		self.stop = mp.Event()
 		self.rdy = mp.Event()
 		
@@ -33,28 +54,27 @@ class PyDAQ:
 	def plot(self):
 		self.plotting_thread = mp.Process(target = plotThread.plot, 
                       args = (self.input_read_end, self.stop, self.rdy,))
-		print(self.plotting_thread)
 
 	def aquisition(self, outputShape):
 		if(self.feedback_thread is not None):
 			print("WARNING: You can not run both feedback and aquisition at the same time, "
 				 +"not starting aquisition")
 		else:
+			outputshape = np.full(0, 200, dtype = np.float64)
 			self.aquisition_thread = mp.Process(target = simpleRead.startCallBack, 
 			     args = (self.input_write_end, self.output_read_end, 
 			     self.stop, outputShape,)) 
 
-	def Feedback(self):
-		if(self.aquisition_thread.is_alive()):
+	def Feedback(self, transferFunct):
+		if(self.aquisition_thread is not None):
 			print("WARNING: You can not run both feedback and aquisition at the same time, "
 				 +"not starting feedback")
 		else:
 			self.feedback_thread = mp.Process(target = feedback.feedback, 
-			     args = (input_write_end, stop,))
+			     args = (self.input_write_end, self.stop, transferFunct,))
 
 	def begin(self):
 		if(self.aquisition_thread is not None):
-			print("starting")
 			self.aquisition_thread.start()
 		if(self.plotting_thread is not None):
 			self.plotting_thread.start()
