@@ -30,7 +30,7 @@ def testIfName():
 		tp.start()
 	except RuntimeError as e:
 		print("CRITICAL ERROR: you forgot to nest your code in: \"'if __name__ == '__main__':\"")
-		print("this would cause a crash later in this module")
+		print("this would cause a crash later in this module exiting")
 	else:
 		tp.join()
 	if(not cv.is_set()):
@@ -50,26 +50,51 @@ class PyDAQ:
 		self.plotting_thread = None
 		self.aquisition_thread = None
 		self.feedback_thread = None
-
+		
+		self.activeChannels = []
+		
 	def plot(self):
 		self.plotting_thread = mp.Process(target = plotThread.plot, 
                       args = (self.input_read_end, self.stop, self.rdy,))
 
-	def aquisition(self, outputShape):
+	def aquire(self, inputChannel, samplerate=1000, maxMeasure=10, minMeasure=-10):
 		if(self.feedback_thread is not None):
 			print("WARNING: You can not run both feedback and aquisition at the same time, "
 				 +"not starting aquisition")
 		else:
-			outputshape = np.full(0, 200, dtype = np.float64)
+			self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, [inputChannel])
+			outputshape = np.full(0, samplerate, dtype = np.float64)
+			self.aquisition_thread = mp.Process(target = simpleRead.startReadOnly, 
+			     args = (self.input_write_end, self.output_read_end, self.stop,
+			     inputChannel, samplerate, maxMeasure, minMeasure,)) 
+
+	def gen(self, inputChannel, samplerate=1000, maxMeasure=10, minMeasure=-10):
+		if(self.feedback_thread is not None):
+			print("WARNING: You can not run both feedback and aquisition at the same time, "
+				 +"not starting aquisition")
+		else:
+			self.checkIfValidArgs(samplerate, maxMeasure, minMeasure)
+			outputshape = np.full(0, samplerate, dtype = np.float64)
 			self.aquisition_thread = mp.Process(target = simpleRead.startCallBack, 
 			     args = (self.input_write_end, self.output_read_end, 
 			     self.stop, outputShape,)) 
+ 
+	def aquireAndGen(self, input, output, outputShape, samplerate=1000, maxMeasure=10, minMeasure=-10):
+		if(self.feedback_thread is not None):
+			print("WARNING: You can not run both feedback and aquisition at the same time, "
+				 +"not starting aquisition")
+		else:
+			self.checkIfValidArgs(samplerate, maxMeasure, minMeasure)
+			self.aquisition_thread = mp.Process(target = simpleRead.startCallBack, 
+				 args = (self.input_write_end, self.output_read_end, 
+				 self.stop, outputShape,))  
 
-	def Feedback(self, transferFunct):
+	def feedback(self, transferFunct, samplerate=1000, maxMeasure=10, minMeasure=-10):
 		if(self.aquisition_thread is not None):
 			print("WARNING: You can not run both feedback and aquisition at the same time, "
 				 +"not starting feedback")
 		else:
+			self.checkIfValidArgs(samplerate, maxMeasure, minMeasure)
 			self.feedback_thread = mp.Process(target = feedback.feedback, 
 			     args = (self.input_write_end, self.stop, transferFunct,))
 
@@ -93,4 +118,20 @@ class PyDAQ:
 			self.aquisition_thread.join()
 		if(self.plotting_thread is not None):
 			self.plotting_thread.join()
+	
+	def checkIfValidArgs(self, samplerate, maxMeasure, minMeasure, channels):
+		#check if the inputs are valid
+		for channel in channels:
+			if(type(channel) == str()):
+				if(channel in self.activeChannels):
+					print("ERROR: channel ("+channel+") is already in use!")
+				else:
+					self.activeChannels.append(channel)
+		
+		if(not -10 < maxMeasure <= 10):
+			print("WARNING: maxMeasure  must be > -10 and <= 10 (for the myDAQ)")
+		if(not 10 > minMeasure >= -10):
+			print("WARNING: minMeasure  must be <= -10 and < 10 (for the myDAQ)")
+		if(not 0 < samplerate <= 200000):
+			print("WARNING: samplerate must be > 0 and <=200000 (for the myDAQ)")
 

@@ -17,11 +17,14 @@ def transferFunct(buffer, feedbackSig):
 
 outputShape = np.sin(np.linspace(0, 2*np.pi, num =200, endpoint=False, dtype=np.float64))
 
+"myDAQ1/ao0"
+"myDAQ1/ai0"
+
 if __name__ == '__main__':
 	pd = pd.PyDAQ()
 	pd.plot()
-	# pd.Feedback(transferFunct)
-	pd.aquisition(outputShape)
+	#pd.feedback(transferFunct)
+	pd.aquire("myDAQ1/ai0")
 
 	pd.begin()
 	pd.menu()
