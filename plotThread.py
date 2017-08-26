@@ -3,9 +3,29 @@ import numpy as np
 import matplotlib
 #matplotlib.use('GTKAgg')
 from matplotlib import pyplot as plt
-from collections import deque
 import numpy as np
 from circBuff import circularNumpyBuffer
+
+def writeToFile(read_end, fileName, format):
+	if(format="text"):
+		with open(fileName+'.csv','a') as f_handle:
+			while(not stop.is_set())
+				if(read_end.poll(0.1)):
+					np.savetxt(f_handle, data)
+				else:
+					continue
+	else if(format="binairy"):
+		with open(fileName+'.bin','a+b') as f_handle:
+			while(not stop.is_set())
+				if(read_end.poll(0.1)):
+					np.save(f_handle, data)
+				else:
+					continue
+	else if(format="compressedBinairy"):
+		pass #TODO
+
+# def readFromFile(fileName, format):
+#TODO
 
 def waitForData(read_end, stop):
 	while(not read_end.poll(0.1)):

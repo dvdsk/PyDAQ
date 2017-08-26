@@ -82,7 +82,6 @@ class ReadCallbackTask(Task):
 			byref(read), #reference where to store: numb of samples read
 			None)
 		self.a.extend(self.data.tolist())
-		#print(self.data[0])
 		self.write_end.send(self.data)
 		return 0 # The function should return an integer
 	def DoneCallback(self, status):

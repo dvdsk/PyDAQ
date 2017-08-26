@@ -28,6 +28,7 @@ if __name__ == '__main__':
 	#pd.gen("myDAQ1/ao1", outputShape)
 	#pd.aquire("myDAQ1/ai1")
 	pd.aquireAndGen("myDAQ1/ai1", "myDAQ1/ao1", outputShape)
+	pd.writeToFile("test")
 	
 	pd.begin()
 	pd.menu()

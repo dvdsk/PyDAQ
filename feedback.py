@@ -22,7 +22,7 @@ as they will be automatically converted by ctypes
 to pass by referenceNULL in C becomes None in Python
 """
 class ReadTask(Task):
-	def __init__(self):
+	def __init__(self, inputChannel, samplerate, maxMeasure, minMeasure):
 		Task.__init__(self)
 		self.data = np.empty(200)
 		self.a = []
@@ -31,11 +31,11 @@ class ReadTask(Task):
 		#configurate input channel, where we read the ouput from the myDAQ
 		try:
 			self.CreateAIVoltageChan(
-				"myDAQ1/ai0", #The name of the physical channel muDAQ1/aiN  (n= 0 or 1)
+				inputChannel, #The name of the physical channel muDAQ1/aiN  (n= 0 or 1)
 				"", #name to assign to virt channel mapped to phys channel above
 				DAQmx_Val_Cfg_Default, #measurement technique used
-				-10.0, #min value expected to measure
-				10.0, #max value expected to measure
+				minMeasure, #min value expected to measure
+				maxMeasure, #max value expected to measure
 				DAQmx_Val_Volts, #units for min val and max val
 				None) #name of custom scale if used
 		except DAQError:
@@ -46,13 +46,13 @@ class ReadTask(Task):
 		#configurate timing and sample rate for the samples
 		self.CfgSampClkTiming(
 			"", #source terimal of Sample clock ("" means onboard clock)
-			200.0, #sample rate (units: samples/second/channel)
+			samplerate, #sample rate (units: samples/second/channel)
 			DAQmx_Val_Rising, #aquire on rising edge of sample clock
 			DAQmx_Val_ContSamps, #aquire continues until task stopped
-			200) #numb to aquire if finitSamps/ bufferSize if contSamps (bufsize in this case)
+			samplerate) #numb to aquire if finitSamps/ bufferSize if contSamps (bufsize in this case)
 
 class WriteTask(Task):
-	def __init__(self):
+	def __init__(self, outputChannel, maxMeasure, minMeasure):
 		Task.__init__(self)
 		self.sampswritten = int32()
 		self.a = []
@@ -61,10 +61,10 @@ class WriteTask(Task):
 		#configurate output channel, this is the signal the myDAQ outputs
 		try:
 			self.CreateAOVoltageChan(
-				"myDAQ1/ao0", #The name of the physical channel muDAQ1/aiN  (n= 0 or 1)
+				outputChannel, #The name of the physical channel muDAQ1/aiN  (n= 0 or 1)
 				"", #name to assign to virt channel mapped to phys channel above
-				-10.0, #min value expected to output
-				10.0, #max value expected to output
+				minMeasure, #min value expected to output
+				maxMeasure, #max value expected to output
 				DAQmx_Val_Volts, #units for min val and max val
 				None) #name of custom scale if used
 		except DAQError:
@@ -74,7 +74,8 @@ class WriteTask(Task):
 		#not configuring sample timing -> driver in on demand sample for anolog out
 
 
-def feedback(write_end, stop, transferFunct):
+def feedback(write_end, stop, transferFunct, inputChannel, 
+outputChannel, samplerate, maxMeasure, minMeasure):
 	buffer = circularNumpyBuffer(10000, dtype=np.float64) #TODO expose to user (len)
 	data = np.empty(100, dtype=np.float64)
 	sampsWritten = int32()
@@ -84,8 +85,8 @@ def feedback(write_end, stop, transferFunct):
 	start_idx = 0
 
 	t0 = time.time()
-	writeTask = WriteTask()
-	readTask = ReadTask()
+	writeTask = WriteTask(outputChannel, maxMeasure, minMeasure)
+	readTask = ReadTask(inputChannel, samplerate, maxMeasure, minMeasure)
 	if(readTask.rdy == False or writeTask.rdy == False):
 		print("errors detected, not starting readout!!")
 		return 
