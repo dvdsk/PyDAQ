@@ -43,7 +43,6 @@ class ReadTask(Task):
 			self.rdy = False
 			return
 			
-			
 		#configurate timing and sample rate for the samples
 		self.CfgSampClkTiming(
 			"", #source terimal of Sample clock ("" means onboard clock)

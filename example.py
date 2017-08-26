@@ -24,8 +24,9 @@ if __name__ == '__main__':
 	pd = pd.PyDAQ()
 	pd.plot()
 	#pd.feedback(transferFunct)
-	pd.aquire("myDAQ1/ai0")
-
+	#pd.aquire("myDAQ1/ai0")
+	pd.gen("myDAQ1/ao0", outputShape)
+	
 	pd.begin()
 	pd.menu()
 	pd.end()

@@ -67,10 +67,8 @@ class ReadCallbackTask(Task):
 			samplerate) #numb to aquire if finitSamps/ bufferSize if contSamps (bufsize in this case)
 		self.AutoRegisterEveryNSamplesEvent(
 			DAQmx_Val_Acquired_Into_Buffer, #the event on which the callback task starts
-			samplerate) #number of samples after which event should occur
-		# self.AutoRegisterEveryNSamplesEvent(
-			# DAQmx_Val_Acquired_Into_Buffer, #the event on which the callback task starts
-			# samplerate) #number of samples after which event should occur
+			samplerate, #number of samples after which event should occur
+			0) #process callback funct in daqmx thread (alternative DAQmx_Val_SynchronousEventCallbacks)
 		self.AutoRegisterDoneEvent(0)
 		
 	def EveryNCallback(self):
@@ -94,7 +92,6 @@ class ReadCallbackTask(Task):
 class WriteTask(Task):
 	def __init__(self, outputChannel, outputData, samplerate, maxMeasure, minMeasure):
 		Task.__init__(self)
-		self.outputData = outputData
 		self.sampswritten = int32()
 		self.a = []
 		self.rdy = True
@@ -120,11 +117,11 @@ class WriteTask(Task):
 			DAQmx_Val_ContSamps, #generate continues until task stopped
 			samplerate) #numb to generate if finitSamps/ bufferSize if contSamps (bufsize in this case)
 		self.WriteAnalogF64(
-			samplerate, #number of samples to write
+			len(outputData), #number of samples to write
 			False, #start output automatically
 			DAQmx_Val_WaitInfinitely, #timeout to wait for funct to write samples 
 			DAQmx_Val_GroupByChannel, #read entire channel in one go
-			self.outputData, #source array from which to write the data
+			outputData, #source array from which to write the data
 			byref(self.sampswritten), #variable to store the numb of written samps in
 			None)
 
@@ -145,18 +142,19 @@ def startReadOnly(input_write_end, output_read_end, stop,
 	readInTask.ClearTask()
 	print("myDAQ shut down succesfully\n")
 
-def startGenOnly(output_read_end, stop, outputChannel,
+def startGenOnly(output_read_end, stop, rdy, outputChannel,
 				 outputShape, samplerate, maxMeasure, minMeasure):
 
 	sampswritten = int32()
-
-	writeInTask=WriteTask(outputShape)
+	writeInTask=WriteTask(outputChannel, outputShape, samplerate, maxMeasure, minMeasure)
 	if(writeInTask.rdy == False):
 		print("errors detected, not starting readout!!")
 		return 
 
 	writeInTask.StartTask()
-
+	print("started gen")
+	rdy.set()
+	
 	#every second check if the output should change
 	while(not stop.wait(1)):
 		if(output_read_end.poll()):
@@ -172,6 +170,8 @@ def startGenOnly(output_read_end, stop, outputChannel,
 				outputData, #source array from which to write the data
 				byref(sampswritten), #variable to store the numb of written samps in
 				None)
+		else:
+			continue
 
 	#shutdown routine
 	#start by setting the output signal to zero

@@ -49,12 +49,26 @@ class PyDAQ:
 		
 		self.plotting_thread = None
 		self.aquisition_thread = None
+		self.gen_thread = None
+		self.aquireAndGen_thread = None
 		self.feedback_thread = None
 		
+		self.processes = {"plotting": None,
+		                  "aquisition": None,
+				          "gen": None,
+				          "aquireAndGen": None,
+				          "feedback": None}
+						  
+		self.rdy = {"plotting": None,
+				    "aquisition": None,
+				    "gen": None,
+				    "aquireAndGen": None,
+				    "feedback": None}
+						  
 		self.activeChannels = []
 		
 	def plot(self):
-		self.plotting_thread = mp.Process(target = plotThread.plot, 
+		self.processes["plotting"] = mp.Process(target = plotThread.plot, 
                       args = (self.input_read_end, self.stop, self.rdy,))
 
 	def aquire(self, inputChannel, samplerate=1000, maxMeasure=10, minMeasure=-10):
@@ -64,20 +78,21 @@ class PyDAQ:
 		else:
 			self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, [inputChannel])
 			outputshape = np.full(0, samplerate, dtype = np.float64)
-			self.aquisition_thread = mp.Process(target = simpleRead.startReadOnly, 
+			self.rdy["aquisition"] = mp.Event()
+			self.processes["aquisition"] = mp.Process(target = simpleRead.startReadOnly, 
 			     args = (self.input_write_end, self.output_read_end, self.stop,
 			     inputChannel, samplerate, maxMeasure, minMeasure,)) 
 
-	def gen(self, inputChannel, samplerate=1000, maxMeasure=10, minMeasure=-10):
+	def gen(self, outputChannel, outputShape, samplerate=1000, maxMeasure=10, minMeasure=-10):
 		if(self.feedback_thread is not None):
 			print("WARNING: You can not run both feedback and aquisition at the same time, "
 				 +"not starting aquisition")
 		else:
-			self.checkIfValidArgs(samplerate, maxMeasure, minMeasure)
-			outputshape = np.full(0, samplerate, dtype = np.float64)
-			self.aquisition_thread = mp.Process(target = simpleRead.startCallBack, 
-			     args = (self.input_write_end, self.output_read_end, 
-			     self.stop, outputShape,)) 
+			self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, [outputChannel])
+			self.rdy["gen"] = mp.Event()
+			self.processes["gen"] = mp.Process(target = simpleRead.startGenOnly, 
+			     args = (self.output_read_end, self.stop, self.rdy["gen"], outputChannel, outputShape,
+			     samplerate, maxMeasure, minMeasure,)) 
  
 	def aquireAndGen(self, input, output, outputShape, samplerate=1000, maxMeasure=10, minMeasure=-10):
 		if(self.feedback_thread is not None):
@@ -85,7 +100,8 @@ class PyDAQ:
 				 +"not starting aquisition")
 		else:
 			self.checkIfValidArgs(samplerate, maxMeasure, minMeasure)
-			self.aquisition_thread = mp.Process(target = simpleRead.startCallBack, 
+			self.rdy["aquireAndGen"] = mp.Event()
+			self.processes["aquireAndGen"] = mp.Process(target = simpleRead.startReadAndGen, 
 				 args = (self.input_write_end, self.output_read_end, 
 				 self.stop, outputShape,))  
 
@@ -95,29 +111,28 @@ class PyDAQ:
 				 +"not starting feedback")
 		else:
 			self.checkIfValidArgs(samplerate, maxMeasure, minMeasure)
-			self.feedback_thread = mp.Process(target = feedback.feedback, 
+			self.rdy["feedback"] = mp.Event()
+			self.processes["feedback"] = mp.Process(target = feedback.feedback, 
 			     args = (self.input_write_end, self.stop, transferFunct,))
 
 	def begin(self):
-		if(self.aquisition_thread is not None):
-			self.aquisition_thread.start()
-		if(self.plotting_thread is not None):
-			self.plotting_thread.start()
-		if(self.feedback_thread is not None):
-			self.feedback_thread.start()
+		for process in self.processes.values():
+			if(process is not None):
+				process.start()
+		#wait for all processes to report rdy
+		for rdy in self.rdy.values():
+			if(rdy is not None):
+				rdy.wait()
 
 	def menu(self):
-		self.rdy.wait()
 		input('Press Enter to stop\n')
 
 	def end(self):
 		self.stop.set()
-		if(self.feedback_thread is not None):
-			self.feedback_thread.join()
-		if(self.aquisition_thread is not None):
-			self.aquisition_thread.join()
-		if(self.plotting_thread is not None):
-			self.plotting_thread.join()
+		for processName, process in self.processes.items():
+			if(process is not None):
+				process.join()
+				print(processName+" has stopped")
 	
 	def checkIfValidArgs(self, samplerate, maxMeasure, minMeasure, channels):
 		#check if the inputs are valid
