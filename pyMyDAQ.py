@@ -42,7 +42,6 @@ class PyDAQ:
 		testIfName()
 		
 		self.stop = mp.Event()
-		self.rdy = mp.Event()
 		
 		self.input_write_end, self.input_read_end = mp.Pipe()
 		self.output_write_end, self.output_read_end = mp.Pipe()
@@ -68,8 +67,10 @@ class PyDAQ:
 		self.activeChannels = []
 		
 	def plot(self):
+		#self.rdy["plotting"] = mp.Event()
 		self.processes["plotting"] = mp.Process(target = plotThread.plot, 
-                      args = (self.input_read_end, self.stop, self.rdy,))
+                      args = (self.input_read_end, self.stop,))
+					  
 
 	def aquire(self, inputChannel, samplerate=1000, maxMeasure=10, minMeasure=-10):
 		if(self.feedback_thread is not None):
@@ -80,8 +81,8 @@ class PyDAQ:
 			outputshape = np.full(0, samplerate, dtype = np.float64)
 			self.rdy["aquisition"] = mp.Event()
 			self.processes["aquisition"] = mp.Process(target = simpleRead.startReadOnly, 
-			     args = (self.input_write_end, self.output_read_end, self.stop,
-			     inputChannel, samplerate, maxMeasure, minMeasure,)) 
+			     args = (self.input_write_end, self.output_read_end, self.stop, 
+			     self.rdy["aquisition"], inputChannel, samplerate, maxMeasure, minMeasure,)) 
 
 	def gen(self, outputChannel, outputShape, samplerate=1000, maxMeasure=10, minMeasure=-10):
 		if(self.feedback_thread is not None):
@@ -94,16 +95,17 @@ class PyDAQ:
 			     args = (self.output_read_end, self.stop, self.rdy["gen"], outputChannel, outputShape,
 			     samplerate, maxMeasure, minMeasure,)) 
  
-	def aquireAndGen(self, input, output, outputShape, samplerate=1000, maxMeasure=10, minMeasure=-10):
+	def aquireAndGen(self, inputChannel, outputChannel, outputShape, 
+		samplerate=1000, maxMeasure=10, minMeasure=-10):
 		if(self.feedback_thread is not None):
 			print("WARNING: You can not run both feedback and aquisition at the same time, "
 				 +"not starting aquisition")
 		else:
-			self.checkIfValidArgs(samplerate, maxMeasure, minMeasure)
+			self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, [inputChannel, outputChannel])
 			self.rdy["aquireAndGen"] = mp.Event()
 			self.processes["aquireAndGen"] = mp.Process(target = simpleRead.startReadAndGen, 
-				 args = (self.input_write_end, self.output_read_end, 
-				 self.stop, outputShape,))  
+				 args = (self.input_write_end, self.output_read_end, self.stop, self.rdy["aquireAndGen"],
+				 outputChannel, outputShape,inputChannel, samplerate, maxMeasure, minMeasure))  
 
 	def feedback(self, transferFunct, samplerate=1000, maxMeasure=10, minMeasure=-10):
 		if(self.aquisition_thread is not None):
@@ -119,7 +121,7 @@ class PyDAQ:
 		for process in self.processes.values():
 			if(process is not None):
 				process.start()
-		#wait for all processes to report rdy
+		#wait for all processes to report rdy so the menu can be run
 		for rdy in self.rdy.values():
 			if(rdy is not None):
 				rdy.wait()
@@ -132,7 +134,7 @@ class PyDAQ:
 		for processName, process in self.processes.items():
 			if(process is not None):
 				process.join()
-				print(processName+" has stopped")
+				print("{0:15} {1}".format(processName+":", "stopped"))
 	
 	def checkIfValidArgs(self, samplerate, maxMeasure, minMeasure, channels):
 		#check if the inputs are valid

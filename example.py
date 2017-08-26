@@ -15,7 +15,7 @@ def transferFunct(buffer, feedbackSig):
 	print("feedbackSig:",feedbackSig)
 	return feedbackSig
 
-outputShape = np.sin(np.linspace(0, 2*np.pi, num =200, endpoint=False, dtype=np.float64))
+outputShape = np.sin(np.linspace(0, 2*np.pi, num =2000, endpoint=False, dtype=np.float64))
 
 "myDAQ1/ao0"
 "myDAQ1/ai0"
@@ -24,8 +24,10 @@ if __name__ == '__main__':
 	pd = pd.PyDAQ()
 	pd.plot()
 	#pd.feedback(transferFunct)
-	#pd.aquire("myDAQ1/ai0")
-	pd.gen("myDAQ1/ao0", outputShape)
+
+	#pd.gen("myDAQ1/ao1", outputShape)
+	#pd.aquire("myDAQ1/ai1")
+	pd.aquireAndGen("myDAQ1/ai1", "myDAQ1/ao1", outputShape)
 	
 	pd.begin()
 	pd.menu()

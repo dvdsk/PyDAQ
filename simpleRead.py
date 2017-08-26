@@ -37,7 +37,7 @@ class ReadCallbackTask(Task):
 	def __init__(self, write_end, inputChannel, samplerate, maxMeasure, minMeasure):
 		Task.__init__(self)
 		self.write_end = write_end #transport pipe to other process
-		self.data = np.empty(2000)
+		self.data = np.empty(samplerate)
 		self.a = []
 		self.rdy = True
 		self.samplerate = samplerate
@@ -53,8 +53,8 @@ class ReadCallbackTask(Task):
 				DAQmx_Val_Volts, #units for min val and max val
 				None) #name of custom scale if used
 		except DAQError:
-			print("CRITICAL: INCORRECT channel, is there a mydaq connected?, "
-			     +"are you specifing an input channel?")
+			print("CRITICAL: INCORRECT inputChannel ("+inputChannel+"), is there a mydaq connected?, "
+			     +"are you specifing an inputChannel?")
 			self.rdy = False
 			return
 		
@@ -105,7 +105,8 @@ class WriteTask(Task):
 				DAQmx_Val_Volts, #units for min val and max val
 				None) #name of custom scale if used
 		except DAQError:
-			print("CRITICAL: NO MYDAQ DETECTED, is there a mydaq connected?")
+			print("CRITICAL: INCORRECT outputChannel ("+outputChannel+"), is there a mydaq connected?, "
+			     +"are you specifing an outputChannel?")
 			self.rdy = False
 			return
 		
@@ -115,7 +116,7 @@ class WriteTask(Task):
 			samplerate, #sample rate (units: samples/second/channel)
 			DAQmx_Val_Rising, #generage on rising edge of sample clock
 			DAQmx_Val_ContSamps, #generate continues until task stopped
-			samplerate) #numb to generate if finitSamps/ bufferSize if contSamps (bufsize in this case)
+			len(outputData)) #numb to generate if finitSamps/ bufferSize if contSamps (bufsize in this case)
 		self.WriteAnalogF64(
 			len(outputData), #number of samples to write
 			False, #start output automatically
@@ -125,7 +126,7 @@ class WriteTask(Task):
 			byref(self.sampswritten), #variable to store the numb of written samps in
 			None)
 
-def startReadOnly(input_write_end, output_read_end, stop,
+def startReadOnly(input_write_end, output_read_end, stop, rdy,
 	              inputChannel, samplerate, maxMeasure, minMeasure):
 	sampswritten = int32()
 	
@@ -135,12 +136,13 @@ def startReadOnly(input_write_end, output_read_end, stop,
 		return 
 
 	readInTask.StartTask()
+	rdy.set()
 	stop.wait()
-	
+
 	#shutdown routine
 	readInTask.StopTask()
 	readInTask.ClearTask()
-	print("myDAQ shut down succesfully\n")
+	print(inputChannel+": closed")
 
 def startGenOnly(output_read_end, stop, rdy, outputChannel,
 				 outputShape, samplerate, maxMeasure, minMeasure):
@@ -148,7 +150,7 @@ def startGenOnly(output_read_end, stop, rdy, outputChannel,
 	sampswritten = int32()
 	writeInTask=WriteTask(outputChannel, outputShape, samplerate, maxMeasure, minMeasure)
 	if(writeInTask.rdy == False):
-		print("errors detected, not starting readout!!")
+		print("errors detected, not starting generation!!")
 		return 
 
 	writeInTask.StartTask()
@@ -187,21 +189,22 @@ def startGenOnly(output_read_end, stop, rdy, outputChannel,
 
 	writeInTask.StopTask()
 	writeInTask.ClearTask()
-	print("myDAQ shut down succesfully\n")
+	print(outputChannel+": closed and reset to 0 volt")
 
-def startReadAndGen(input_write_end, output_read_end, stop, outputChannel,
+def startReadAndGen(input_write_end, output_read_end, stop, rdy, outputChannel,
 	                outputShape, inputChannel, samplerate, maxMeasure, minMeasure):
 	sampswritten = int32()
 	
-	readInTask= ReadCallbackTask(input_write_end)
-	writeInTask=WriteTask(outputShape)
+	readInTask= ReadCallbackTask(input_write_end, inputChannel, samplerate, maxMeasure, minMeasure)
+	writeInTask=WriteTask(outputChannel, outputShape, samplerate, maxMeasure, minMeasure)
 	if(readInTask.rdy == False or writeInTask.rdy == False):
-		print("errors detected, not starting readout!!")
+		print("errors detected, not starting generation nor readout!!")
 		return 
 
 	readInTask.StartTask()
 	writeInTask.StartTask()
-
+	rdy.set()
+	
 	#every second check if the output should change
 	while(not stop.wait(1)):
 		if(output_read_end.poll()):
@@ -234,4 +237,4 @@ def startReadAndGen(input_write_end, output_read_end, stop, outputChannel,
 	writeInTask.StopTask()
 	readInTask.ClearTask()
 	writeInTask.ClearTask()
-	print("myDAQ shut down succesfully\n")
+	print(inputChannel+": closed, "+outputChannel+": closed and reset to 0 volt")
