@@ -1,5 +1,6 @@
 """MAIN FILE"""
 import multiprocessing as mp
+import threading
 import numpy as np
 import sys
 
@@ -101,9 +102,9 @@ class PyDAQ:
 			         outputChannel, samplerate, maxMeasure, minMeasure,))
 
 	def writeToFile(self, fileName, format="text"):
-		if("writeToFile" not in self.processes.keys())
-			self.processes["writeToFile"] = threading.Thread(
-				target=plotThread.writeToFile, args=(self.inputToFile_read_end, fileName, format))
+		# if("writeToFile" not in self.processes.keys())
+		self.processes["writeToFile"] = threading.Thread(
+			target=plotThread.writeToFile, args=(self.stop, self.inputToFile_read_end, fileName, format))
 
 	# def readFromFile(self, fileName, format="text"):
 		

@@ -6,22 +6,22 @@ from matplotlib import pyplot as plt
 import numpy as np
 from circBuff import circularNumpyBuffer
 
-def writeToFile(read_end, fileName, format):
-	if(format="text"):
+def writeToFile(stop, read_end, fileName, format):
+	if(format=="text"):
 		with open(fileName+'.csv','a') as f_handle:
-			while(not stop.is_set())
+			while(not stop.is_set()):
 				if(read_end.poll(0.1)):
 					np.savetxt(f_handle, data)
 				else:
 					continue
-	else if(format="binairy"):
+	elif(format=="binairy"):
 		with open(fileName+'.bin','a+b') as f_handle:
-			while(not stop.is_set())
+			while(not stop.is_set()):
 				if(read_end.poll(0.1)):
 					np.save(f_handle, data)
 				else:
 					continue
-	else if(format="compressedBinairy"):
+	elif(format=="compressedBinairy"):
 		pass #TODO
 
 # def readFromFile(fileName, format):

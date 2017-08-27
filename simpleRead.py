@@ -34,9 +34,8 @@ import warnings
 
 
 class ReadCallbackTask(Task):
-	def __init__(self, write_end, inputChannel, samplerate, maxMeasure, minMeasure):
+	def __init__(self, inputChannel, samplerate, maxMeasure, minMeasure):
 		Task.__init__(self)
-		self.write_end = write_end #transport pipe to other process
 		self.data = np.empty(samplerate)
 		self.a = []
 		self.rdy = True
@@ -71,6 +70,15 @@ class ReadCallbackTask(Task):
 			0) #process callback funct in daqmx thread (alternative DAQmx_Val_SynchronousEventCallbacks)
 		self.AutoRegisterDoneEvent(0)
 		
+	def DoneCallback(self, status):
+		print("Status"),status.value
+		return 0 # The function should return an integer
+
+class ReadToPlot(ReadCallbackTask):
+	def __init__(self, write_end, inputChannel, samplerate, maxMeasure, minMeasure):
+		ReadCallbackTask.__init__(self, inputChannel, samplerate, maxMeasure, minMeasure)
+		self.write_end = write_end #transport pipe to other process
+		
 	def EveryNCallback(self):
 		read = int32()
 		self.ReadAnalogF64(
@@ -84,9 +92,36 @@ class ReadCallbackTask(Task):
 		self.a.extend(self.data.tolist())
 		self.write_end.send(self.data)
 		return 0 # The function should return an integer
-	def DoneCallback(self, status):
-		print("Status"),status.value
-		return 0 # The function should return an integer
+
+# class ReadToWrite(ReadCallbackTask):
+	# def EveryNCallback(self):
+		# read = int32()
+		# self.ReadAnalogF64(
+			# self.samplerate, #number of samples to read
+			# 10.0, #timeout in seconds
+			# DAQmx_Val_GroupByChannel, #read entire channel in one go
+			# self.data, #array where the samples should be put in
+			# self.samplerate, #number of samples 
+			# byref(read), #reference where to store: numb of samples read
+			# None)
+		# self.a.extend(self.data.tolist())
+		# self.write_end.send(self.data)
+		# return 0 # The function should return an integer
+
+# class ReadToPlotAndWrite(ReadCallbackTask):
+	# def EveryNCallback(self):
+		# read = int32()
+		# self.ReadAnalogF64(
+			# self.samplerate, #number of samples to read
+			# 10.0, #timeout in seconds
+			# DAQmx_Val_GroupByChannel, #read entire channel in one go
+			# self.data, #array where the samples should be put in
+			# self.samplerate, #number of samples 
+			# byref(read), #reference where to store: numb of samples read
+			# None)
+		# self.a.extend(self.data.tolist())
+		# self.write_end.send(self.data)
+		# return 0 # The function should return an integer
 
 class WriteTask(Task):
 	def __init__(self, outputChannel, outputData, samplerate, maxMeasure, minMeasure):
@@ -129,7 +164,7 @@ def startReadOnly(input_write_end, output_read_end, stop, rdy,
 	              inputChannel, samplerate, maxMeasure, minMeasure):
 	sampswritten = int32()
 	
-	readInTask= ReadCallbackTask(input_write_end, inputChannel, samplerate, maxMeasure, minMeasure)
+	readInTask= ReadToPlot(input_write_end, inputChannel, samplerate, maxMeasure, minMeasure)
 	if(readInTask.rdy == False):
 		print("errors detected, not starting readout!!")
 		return 
@@ -194,7 +229,7 @@ def startReadAndGen(input_write_end, output_read_end, stop, rdy, outputChannel,
 	                outputShape, inputChannel, samplerate, maxMeasure, minMeasure):
 	sampswritten = int32()
 	
-	readInTask= ReadCallbackTask(input_write_end, inputChannel, samplerate, maxMeasure, minMeasure)
+	readInTask= ReadToPlot(input_write_end, inputChannel, samplerate, maxMeasure, minMeasure)
 	writeInTask=WriteTask(outputChannel, outputShape, samplerate, maxMeasure, minMeasure)
 	if(readInTask.rdy == False or writeInTask.rdy == False):
 		print("errors detected, not starting generation nor readout!!")
