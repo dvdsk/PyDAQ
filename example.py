@@ -22,13 +22,12 @@ outputShape = np.sin(np.linspace(0, 2*np.pi, num =2000, endpoint=False, dtype=np
 
 if __name__ == '__main__':
 	pd = pd.PyDAQ()
-	pd.plot()
+	
 	#pd.feedback(transferFunct)
-
 	#pd.gen("myDAQ1/ao1", outputShape)
-	#pd.aquire("myDAQ1/ai1")
-	pd.aquireAndGen("myDAQ1/ai1", "myDAQ1/ao1", outputShape)
-	pd.writeToFile("test")
+	pd.onlyAquire("myDAQ1/ai1", saveData=False)
+	#pd.aquireAndGen("myDAQ1/ai1", "myDAQ1/ao1", outputShape)
+
 	
 	pd.begin()
 	pd.menu()

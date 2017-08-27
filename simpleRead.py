@@ -74,7 +74,7 @@ class ReadCallbackTask(Task):
 		print("Status"),status.value
 		return 0 # The function should return an integer
 
-class ReadToPlot(ReadCallbackTask):
+class ReadToOnePipe(ReadCallbackTask):
 	def __init__(self, write_end, inputChannel, samplerate, maxMeasure, minMeasure):
 		ReadCallbackTask.__init__(self, inputChannel, samplerate, maxMeasure, minMeasure)
 		self.write_end = write_end #transport pipe to other process
@@ -93,35 +93,25 @@ class ReadToPlot(ReadCallbackTask):
 		self.write_end.send(self.data)
 		return 0 # The function should return an integer
 
-# class ReadToWrite(ReadCallbackTask):
-	# def EveryNCallback(self):
-		# read = int32()
-		# self.ReadAnalogF64(
-			# self.samplerate, #number of samples to read
-			# 10.0, #timeout in seconds
-			# DAQmx_Val_GroupByChannel, #read entire channel in one go
-			# self.data, #array where the samples should be put in
-			# self.samplerate, #number of samples 
-			# byref(read), #reference where to store: numb of samples read
-			# None)
-		# self.a.extend(self.data.tolist())
-		# self.write_end.send(self.data)
-		# return 0 # The function should return an integer
-
-# class ReadToPlotAndWrite(ReadCallbackTask):
-	# def EveryNCallback(self):
-		# read = int32()
-		# self.ReadAnalogF64(
-			# self.samplerate, #number of samples to read
-			# 10.0, #timeout in seconds
-			# DAQmx_Val_GroupByChannel, #read entire channel in one go
-			# self.data, #array where the samples should be put in
-			# self.samplerate, #number of samples 
-			# byref(read), #reference where to store: numb of samples read
-			# None)
-		# self.a.extend(self.data.tolist())
-		# self.write_end.send(self.data)
-		# return 0 # The function should return an integer
+class ReadToTwoPipes(ReadCallbackTask):
+	def __init__(self, write_end1, write_end2, inputChannel, samplerate, maxMeasure, minMeasure):
+		ReadCallbackTask.__init__(self, inputChannel, samplerate, maxMeasure, minMeasure)
+		self.write_end1 = write_end1 #transport pipe to other process
+		self.write_end2 = write_end2 #transport pipe to other process
+	def EveryNCallback(self):
+		read = int32()
+		self.ReadAnalogF64(
+			self.samplerate, #number of samples to read
+			10.0, #timeout in seconds
+			DAQmx_Val_GroupByChannel, #read entire channel in one go
+			self.data, #array where the samples should be put in
+			self.samplerate, #number of samples 
+			byref(read), #reference where to store: numb of samples read
+			None)
+		self.a.extend(self.data.tolist())
+		self.write_end1.send(self.data)
+		self.write_end2.send(self.data)
+		return 0 # The function should return an integer
 
 class WriteTask(Task):
 	def __init__(self, outputChannel, outputData, samplerate, maxMeasure, minMeasure):
@@ -160,11 +150,15 @@ class WriteTask(Task):
 			byref(self.sampswritten), #variable to store the numb of written samps in
 			None)
 
-def startReadOnly(input_write_end, output_read_end, stop, rdy,
+def startReadOnly(input_write_ends, stop, rdy,
 	              inputChannel, samplerate, maxMeasure, minMeasure):
 	sampswritten = int32()
 	
-	readInTask= ReadToPlot(input_write_end, inputChannel, samplerate, maxMeasure, minMeasure)
+	if(len(input_write_ends) == 1):
+		readInTask= ReadToOnePipe(input_write_ends[0], inputChannel, samplerate, maxMeasure, minMeasure)
+	else: #its 2
+		readInTask= ReadToTwoPipes(input_write_ends[0], input_write_ends[1], inputChannel, samplerate, maxMeasure, minMeasure)
+
 	if(readInTask.rdy == False):
 		print("errors detected, not starting readout!!")
 		return 

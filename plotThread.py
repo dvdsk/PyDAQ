@@ -8,16 +8,18 @@ from circBuff import circularNumpyBuffer
 
 def writeToFile(stop, read_end, fileName, format):
 	if(format=="text"):
-		with open(fileName+'.csv','a') as f_handle:
+		with open(fileName+'.csv','a+b') as f_handle:
 			while(not stop.is_set()):
 				if(read_end.poll(0.1)):
-					np.savetxt(f_handle, data)
+					data = read_end.recv()
+					np.savetxt(f_handle, data, fmt='%5.3f') #print every number as 5 characters with 3 decimals (millivolts range is abs accuracy of mydaq
 				else:
 					continue
-	elif(format=="binairy"):
+	elif(format=="binairy"): #TODO
 		with open(fileName+'.bin','a+b') as f_handle:
 			while(not stop.is_set()):
 				if(read_end.poll(0.1)):
+					data = read_end.recv()
 					np.save(f_handle, data)
 				else:
 					continue

@@ -43,73 +43,94 @@ class PyDAQ:
 		testIfName()
 		
 		self.stop = mp.Event()
+		self.plot = None
+		self.saveData = None
+		self.configDone = False
 		
-		self.input_write_end, self.input_read_end = mp.Pipe()
+		self.inputToPlot_write_end, self.inputToPlot_read_end = mp.Pipe()
 		self.inputToFile_write_end, self.inputToFile_read_end = mp.Pipe()
+		
 		self.output_write_end, self.output_read_end = mp.Pipe()
 		
 		self.processes = {}
-		# self.processes = {"plotting": None,
-		                  # "aquisition": None,
-				          # "gen": None,
-				          # "aquireAndGen": None,
-				          # "feedback": None}
-						 
 		self.rdy = {} 
-		# self.rdy = {"plotting": None,
-				    # "aquisition": None,
-				    # "gen": None,
-				    # "aquireAndGen": None,
-				    # "feedback": None}
-						  
 		self.activeChannels = {}
-		
-	def plot(self):
-		#self.rdy["plotting"] = mp.Event()
-		self.processes["plotting"] = mp.Process(target = plotThread.plot, 
-                      args = (self.input_read_end, self.stop,))
 
-	def onlyAquire(self, inputChannel, samplerate=1000, maxMeasure=10, minMeasure=-10):
-		self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, [inputChannel], "aquire")
-		outputshape = np.full(0, samplerate, dtype = np.float64)
+	def setupInputPipes(self, plot, saveData):
+		inputPipes = []
+		if(plot):
+			inputPipes.append(self.inputToPlot_write_end)
+		if(saveData):
+			inputPipes.append(self.inputToFile_write_end)
+		return inputPipes
+
+	def onlyAquire(self, inputChannel, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
+		if(self.configDone):
+			print("you can not combine or use multiple of:  'onlyAquire', 'onlyGen', 'aquireAndGen', 'onlyFeedback'")
+			return
+		self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, [inputChannel], "aquire", plot, saveData)
 		self.rdy["aquisition"] = mp.Event()
 		self.processes["aquisition"] = mp.Process(target = simpleRead.startReadOnly, 
-			 args = (self.input_write_end, self.output_read_end, self.stop, 
+			 args = (self.setupInputPipes(plot, saveData), self.stop, 
 			 self.rdy["aquisition"], inputChannel, samplerate, maxMeasure, minMeasure,)) 
+		self.configDone = True
+		return
 
-	def onlyGen(self, outputChannel, outputShape, samplerate=1000, maxMeasure=10, minMeasure=-10):
+	def onlyGen(self, outputChannel, outputShape, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
+		if(self.configDone):
+			return
 		self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, [outputChannel], "gen")
 		self.rdy["gen"] = mp.Event()
 		self.processes["gen"] = mp.Process(target = simpleRead.startGenOnly, 
 			 args = (self.output_read_end, self.stop, self.rdy["gen"], outputChannel, outputShape,
-			 samplerate, maxMeasure, minMeasure,)) 
+			 plot, saveData, samplerate, maxMeasure, minMeasure,)) 
+		self.configDone = True
+		return
  
-	def aquireAndGen(self, inputChannel, outputChannel, outputShape, 
+	#TODO expand for multi channels
+	def aquireAndGen(self, inputChannels, outputChannels, outputShape, plot=True, saveData=True,
 	samplerate=1000, maxMeasure=10, minMeasure=-10):
-		
+		if(self.configDone):
+			return
 		self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, 
-		[inputChannel, outputChannel], "aquireAndGen")
+		inputChannels.append(outputChannels), "aquireAndGen")
 		self.rdy["aquireAndGen"] = mp.Event()
 		self.processes["aquireAndGen"] = mp.Process(target = simpleRead.startReadAndGen, 
 			 args = (self.input_write_end, self.output_read_end, self.stop, self.rdy["aquireAndGen"],
-			 outputChannel, outputShape,inputChannel, samplerate, maxMeasure, minMeasure))  
+			 outputChannel[0], outputShape,inputChannel[0], plot, saveData, samplerate, maxMeasure, minMeasure))  
+		self.configDone = True
+		return
 
-	def onlyFeedback(self, transferFunct, samplerate=1000, maxMeasure=10, minMeasure=-10):
+	def onlyFeedback(self, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
+		if(self.configDone):
+			return
 		self.checkIfValidArgs(samplerate, maxMeasure, minMeasure,  "feedback")
 		self.rdy["feedback"] = mp.Event()
 		self.processes["feedback"] = mp.Process(target = feedback.feedback, 
 			 args = (self.input_write_end, self.stop, transferFunct,inputChannel, 
-			         outputChannel, samplerate, maxMeasure, minMeasure,))
+			         outputChannel, plot, saveData, samplerate, maxMeasure, minMeasure,))
+		self.configDone = True
+		return
 
-	def writeToFile(self, fileName, format="text"):
-		# if("writeToFile" not in self.processes.keys())
-		self.processes["writeToFile"] = threading.Thread(
-			target=plotThread.writeToFile, args=(self.stop, self.inputToFile_read_end, fileName, format))
+	def FeedbackAndAquire(self, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
+		pass #TODO
 
-	# def readFromFile(self, fileName, format="text"):
-		
+	def FeedbackAndGen(self, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
+		pass #TODO
+
+	def FeedbackGenAndAquire(self, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
+		pass #TODO
+
+	def DoubleFeedback(self, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
+		pass #TODO
 
 	def begin(self):
+		if(self.plot):
+			self.processes["plotting"] = mp.Process(target = plotThread.plot, 
+			args = (self.inputToPlot_read_end, self.stop,))
+		if(self.saveData):
+			self.processes["writeToFile"] = threading.Thread(target=plotThread.writeToFile, 
+			args=(self.stop, self.inputToFile_read_end, "test", "text"))
 		for process in self.processes.values():
 			# if(process is not None):
 			process.start()
@@ -128,14 +149,17 @@ class PyDAQ:
 			process.join()
 			print("{0:15} {1}".format(processName+":", "stopped"))
 	
-	def checkIfValidArgs(self, samplerate, maxMeasure, minMeasure, channels, methodName):
+	def checkIfValidArgs(self, samplerate, maxMeasure, minMeasure, channels, methodName, plot, saveData):
 		if(not -10 < maxMeasure <= 10):
 			print("WARNING: maxMeasure  must be > -10 and <= 10 (for the myDAQ)")
 		if(not 10 > minMeasure >= -10):
 			print("WARNING: minMeasure  must be <= -10 and < 10 (for the myDAQ)")
 		if(not 0 < samplerate <= 200000):
 			print("WARNING: samplerate must be > 0 and <=200000 (for the myDAQ)")
-	
+		
+		self.plot = plot
+		self.saveData = saveData
+		
 		#check if the inputs are valid
 		for channel in channels:
 			if(type(channel) == str()):
