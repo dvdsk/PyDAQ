@@ -12,6 +12,8 @@ def writeToFile(stop, read_end, fileName, format):
 			while(not stop.is_set()):
 				if(read_end.poll(0.1)):
 					data = read_end.recv()
+					# print("DATA:")
+					# print(data)
 					np.savetxt(f_handle, data, fmt='%5.3f') #print every number as 5 characters with 3 decimals (millivolts range is abs accuracy of mydaq
 				else:
 					continue
@@ -63,16 +65,18 @@ def updateLivePlot(axbackground, ax, fig, lines):
 def plot(read_end, stop, bufferLen=100000):
 	#this buffer is used to keep the last 'bufferLen' points
 	#that have been send from the mydaq for plotting
-	buffer = circularNumpyBuffer(bufferLen, np.float64)
-
+	buffer1 = circularNumpyBuffer(bufferLen, np.float64)
+	buffer2 = circularNumpyBuffer(bufferLen, np.float64)
+	
 	#the x axis is just the number of points for now
 	x = np.linspace(0, bufferLen, num=bufferLen)
 	lines = {} #stores the data all the lines
 
 	waitForData(read_end, stop)
 	data = read_end.recv()#get the data
-	buffer.append(data)   #append it to the buffer
-
+	buffer1.append(data[0,:])   #append it to the buffer
+	buffer2.append(data[1,:])   #append it to the buffer
+	
 	#Start the plot
 	fig = plt.figure()
 	ax = fig.add_subplot(1, 1, 1)
@@ -82,24 +86,25 @@ def plot(read_end, stop, bufferLen=100000):
 
 	#add a new plot line (works just like plt.plot)
 	#another possibility would be plt.scatter
-	lines["plot1"], = ax.plot(buffer.access(), x[:len(buffer)])
-	lines["plot2"], = ax.plot(buffer.access()*2, x[:len(buffer)])
+	lines["plot1"], = ax.plot(buffer1.access(), x[:len(buffer1)])
+	lines["plot2"], = ax.plot(buffer2.access(), x[:len(buffer2)])
 	
 	#keep updating the plot until the program stops
 	while(not stop.is_set()):
 		#if there is new data, update the x and y data of the plots
 		if(read_end.poll()):
 			data = read_end.recv() #get the new data
-			buffer.append(data)    #append it to the buffer
+			buffer1.append(data[0,:]) #append it to the buffer
+			buffer2.append(data[1,:]) #append it to the buffer
 			
 			#send all the data (that now includes the new
 			#data we recieved above ) to matplotlib. Do
 			#this for every plot
-			lines["plot1"].set_ydata(buffer.access())
-			lines["plot1"].set_xdata(x[:len(buffer)])
+			lines["plot1"].set_ydata(buffer1.access())
+			lines["plot1"].set_xdata(x[:len(buffer1)])
 
-			lines["plot2"].set_ydata(buffer.access()*2)
-			lines["plot2"].set_xdata(x[:len(buffer)])
+			lines["plot2"].set_ydata(buffer2.access())
+			lines["plot2"].set_xdata(x[:len(buffer2)])
 
 			#update the view
 			updateLivePlot(cachedPlotData,ax, fig, lines)

@@ -64,15 +64,15 @@ class PyDAQ:
 			inputPipes.append(self.inputToFile_write_end)
 		return inputPipes
 
-	def onlyAquire(self, inputChannel, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
+	def onlyAquire(self, inputChannels, plot=True, saveData=True, samplerate=1000, maxMeasure=[10,10], minMeasure=[-10,-10]):
 		if(self.configDone):
 			print("you can not combine or use multiple of:  'onlyAquire', 'onlyGen', 'aquireAndGen', 'onlyFeedback'")
 			return
-		self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, [inputChannel], "aquire", plot, saveData)
+		maxMeasure, minMeasure, inputChannels = self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, inputChannels, "aquire", plot, saveData)
 		self.rdy["aquisition"] = mp.Event()
 		self.processes["aquisition"] = mp.Process(target = simpleRead.startReadOnly, 
 			 args = (self.setupInputPipes(plot, saveData), self.stop, 
-			 self.rdy["aquisition"], inputChannel, samplerate, maxMeasure, minMeasure,)) 
+			 self.rdy["aquisition"], inputChannels, samplerate, maxMeasure, minMeasure,))
 		self.configDone = True
 		return
 
@@ -92,7 +92,7 @@ class PyDAQ:
 	samplerate=1000, maxMeasure=10, minMeasure=-10):
 		if(self.configDone):
 			return
-		self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, 
+		samplerate, maxMeasure, minMeasure = self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, 
 		inputChannels.append(outputChannels), "aquireAndGen")
 		self.rdy["aquireAndGen"] = mp.Event()
 		self.processes["aquireAndGen"] = mp.Process(target = simpleRead.startReadAndGen, 
@@ -150,16 +150,34 @@ class PyDAQ:
 			print("{0:15} {1}".format(processName+":", "stopped"))
 	
 	def checkIfValidArgs(self, samplerate, maxMeasure, minMeasure, channels, methodName, plot, saveData):
-		if(not -10 < maxMeasure <= 10):
-			print("WARNING: maxMeasure  must be > -10 and <= 10 (for the myDAQ)")
-		if(not 10 > minMeasure >= -10):
-			print("WARNING: minMeasure  must be <= -10 and < 10 (for the myDAQ)")
+		
+		def convertAndExpandArgs(arg, n):
+			if(not isinstance(arg, list)):
+				arg = [arg]
+			while(n < len(arg)):
+				arg.append(arg[-1])
+			return arg
+
+		n = len(channels)
+		channels = convertAndExpandArgs(channels, n)
+		maxMeasure = convertAndExpandArgs(maxMeasure, n)
+		minMeasure = convertAndExpandArgs(minMeasure, n)
+
+		for V in maxMeasure:
+			if(not -10 < V <= 10):
+				print("WARNING: maxMeasure  must be > -10 and <= 10 (for the myDAQ)")
+		for V in minMeasure:
+			if(not 10 > V >= -10):
+				print("WARNING: minMeasure  must be <= -10 and < 10 (for the myDAQ)")
+		for Vmax, Vmin in zip(maxMeasure, minMeasure):
+			if(not Vmax > Vmin):
+				print("WARNING: Vmax must be larger then Vmin")
 		if(not 0 < samplerate <= 200000):
 			print("WARNING: samplerate must be > 0 and <=200000 (for the myDAQ)")
-		
+
 		self.plot = plot
 		self.saveData = saveData
-		
+
 		#check if the inputs are valid
 		for channel in channels:
 			if(type(channel) == str()):
@@ -172,3 +190,5 @@ class PyDAQ:
 					self.activeChannels[channel]["sampleRate"][samplerate]
 					self.activeChannels[channel]["maxMeasure"][maxMeasure]
 					self.activeChannels[channel]["minMeasure"][minMeasure]
+
+		return maxMeasure, minMeasure, channels

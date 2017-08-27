@@ -34,28 +34,28 @@ import warnings
 
 
 class ReadCallbackTask(Task):
-	def __init__(self, inputChannel, samplerate, maxMeasure, minMeasure):
+	def __init__(self, inputChannels, samplerate, maxMeasures, minMeasures):
 		Task.__init__(self)
 		self.data = np.empty(samplerate)
 		self.a = []
 		self.rdy = True
 		self.samplerate = samplerate
-		
-		try:
-			#configurate input channel, where we read the ouput from the myDAQ
-			self.CreateAIVoltageChan(
-				inputChannel, #The name of the physical channel muDAQ1/aiN  (n= 0 or 1)
-				"", #name to assign to virt channel mapped to phys channel above
-				DAQmx_Val_Cfg_Default, #measurement technique used
-				minMeasure, #min value expected to measure
-				maxMeasure, #max value expected to measure
-				DAQmx_Val_Volts, #units for min val and max val
-				None) #name of custom scale if used
-		except DAQError:
-			print("CRITICAL: INCORRECT inputChannel ("+inputChannel+"), is there a mydaq connected?, "
-			     +"are you specifing an inputChannel?")
-			self.rdy = False
-			return
+		for inputChannel, maxMeasure, minMeasure in zip(inputChannels, maxMeasures, minMeasures):
+			try:
+				#configurate input channel, where we read the ouput from the myDAQ
+				self.CreateAIVoltageChan(
+					inputChannel, #The name of the physical channel muDAQ1/aiN  (n= 0 or 1)
+					"", #name to assign to virt channel mapped to phys channel above
+					DAQmx_Val_Cfg_Default, #measurement technique used
+					minMeasure, #min value expected to measure
+					maxMeasure, #max value expected to measure
+					DAQmx_Val_Volts, #units for min val and max val
+					None) #name of custom scale if used
+			except DAQError:
+				print("CRITICAL: INCORRECT inputChannel ("+inputChannel+"), is there a mydaq connected?, "
+					 +"are you specifing an inputChannel?")
+				self.rdy = False
+				return
 		
 		#configurate timing and sample rate for the samples
 		self.CfgSampClkTiming(
@@ -78,24 +78,27 @@ class ReadToOnePipe(ReadCallbackTask):
 	def __init__(self, write_end, inputChannel, samplerate, maxMeasure, minMeasure):
 		ReadCallbackTask.__init__(self, inputChannel, samplerate, maxMeasure, minMeasure)
 		self.write_end = write_end #transport pipe to other process
-		
+		self.nChannels = len(inputChannel)
 	def EveryNCallback(self):
 		read = int32()
 		self.ReadAnalogF64(
 			self.samplerate, #number of samples to read
 			10.0, #timeout in seconds
-			DAQmx_Val_GroupByChannel, #read entire channel in one go
+			DAQmx_Val_GroupByScanNumber, #read first sample of every channel then second etc
 			self.data, #array where the samples should be put in
 			self.samplerate, #number of samples 
 			byref(read), #reference where to store: numb of samples read
 			None)
 		self.a.extend(self.data.tolist())
+		self.data = self.data.reshape((self.nChannels, self.samplerate/self.nChannels))
 		self.write_end.send(self.data)
 		return 0 # The function should return an integer
 
 class ReadToTwoPipes(ReadCallbackTask):
 	def __init__(self, write_end1, write_end2, inputChannel, samplerate, maxMeasure, minMeasure):
 		ReadCallbackTask.__init__(self, inputChannel, samplerate, maxMeasure, minMeasure)
+		self.nChannels = len(inputChannel)
+		print(self.nChannels)
 		self.write_end1 = write_end1 #transport pipe to other process
 		self.write_end2 = write_end2 #transport pipe to other process
 	def EveryNCallback(self):
@@ -103,12 +106,13 @@ class ReadToTwoPipes(ReadCallbackTask):
 		self.ReadAnalogF64(
 			self.samplerate, #number of samples to read
 			10.0, #timeout in seconds
-			DAQmx_Val_GroupByChannel, #read entire channel in one go
+			DAQmx_Val_GroupByScanNumber, #read first sample of every channel then second etc
 			self.data, #array where the samples should be put in
 			self.samplerate, #number of samples 
 			byref(read), #reference where to store: numb of samples read
 			None)
 		self.a.extend(self.data.tolist())
+		self.data = self.data.reshape((self.nChannels, self.samplerate/self.nChannels))
 		self.write_end1.send(self.data)
 		self.write_end2.send(self.data)
 		return 0 # The function should return an integer
@@ -170,7 +174,10 @@ def startReadOnly(input_write_ends, stop, rdy,
 	#shutdown routine
 	readInTask.StopTask()
 	readInTask.ClearTask()
-	print(inputChannel+": closed")
+	if(isinstance(inputChannel, list)):
+		print(", ".join(inputChannel, )+": closed")
+	else:
+		print(inputChannel+": closed")
 
 def startGenOnly(output_read_end, stop, rdy, outputChannel,
 				 outputShape, samplerate, maxMeasure, minMeasure):
@@ -217,7 +224,10 @@ def startGenOnly(output_read_end, stop, rdy, outputChannel,
 
 	writeInTask.StopTask()
 	writeInTask.ClearTask()
-	print(outputChannel+": closed and reset to 0 volt")
+	if(isinstance(outputChannel, list)):
+		print(", ".join(outputChannel, )+": closed")
+	else:
+		print(outputChannel+": closed and reset to 0 volt")
 
 def startReadAndGen(input_write_end, output_read_end, stop, rdy, outputChannel,
 	                outputShape, inputChannel, samplerate, maxMeasure, minMeasure):
@@ -256,7 +266,7 @@ def startReadAndGen(input_write_end, output_read_end, stop, rdy, outputChannel,
 		2, #number of samples to write
 		True, #start output automatically
 		1, #timeout to wait for funct to write samples 
-		DAQmx_Val_GroupByChannel, #read entire channel in one go
+		DAQmx_Val_GroupByScanNumber, #read first sample of every channel then second etc
 		np.array([0,0], dtype=np.float64), #source array from which to write the data
 		byref(sampswritten),  #variable to store the numb of written samps in
 		None)
@@ -265,4 +275,13 @@ def startReadAndGen(input_write_end, output_read_end, stop, rdy, outputChannel,
 	writeInTask.StopTask()
 	readInTask.ClearTask()
 	writeInTask.ClearTask()
-	print(inputChannel+": closed, "+outputChannel+": closed and reset to 0 volt")
+	
+	if(isinstance(outputChannel, list)):
+		outChannString = ", ".join(outputChannel)
+	else:
+		outChannString = outputChannel
+	if(isinstance(inputChannel, list)):
+		inputChannString = ", ".join(inputChannel)
+	else:
+		inputChannString = inputChannel
+	print(inputChannString+": closed, "+outChannString+": closed and reset to 0 volt")

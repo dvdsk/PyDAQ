@@ -25,7 +25,7 @@ if __name__ == '__main__':
 	
 	#pd.feedback(transferFunct)
 	#pd.gen("myDAQ1/ao1", outputShape)
-	pd.onlyAquire("myDAQ1/ai1", saveData=False)
+	pd.onlyAquire(["myDAQ1/ai1","myDAQ1/ai0"], maxMeasure=2)
 	#pd.aquireAndGen("myDAQ1/ai1", "myDAQ1/ao1", outputShape)
 
 	
