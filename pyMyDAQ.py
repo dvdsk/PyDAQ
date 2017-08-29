@@ -45,6 +45,7 @@ class PyDAQ:
 		
 		self.stop = mp.Event()
 		self.plot = False
+		self.nChannelsInData = 1
 		self.saveData = False
 		self.configDone = False
 		
@@ -125,13 +126,10 @@ class PyDAQ:
 	def FeedbackGenAndAquire(self, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
 		pass #TODO
 
-	def DoubleFeedback(self, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
-		pass #TODO
-
 	def begin(self):
 		if(self.plot):
 			self.processes["plotting"] = mp.Process(target = plotThread.plot, 
-			args = (self.inputToPlot_read_end, self.stop,))
+			args = (self.inputToPlot_read_end, self.stop, self.nChannelsInData,))
 		if(self.saveData):
 			self.processes["writeToFile"] = threading.Thread(target=plotThread.writeToFile, 
 			args=(self.stop, self.inputToFile_read_end, "test", "text"))
@@ -162,33 +160,62 @@ class PyDAQ:
 				arg.append(arg[-1])
 			return arg
 
-		n = 1
+		def convertAndExpandArgs_feedback(arg, n):
+			toReturn = []
+			if(not isinstance(arg, list)): #x, x
+				for i in range(n-1):
+					print("appending",toReturn)
+					toReturn.append([arg, arg])
+			elif(not isinstance(arg[0], list)): #[x,x]
+				toReturn.append(arg)
+			return toReturn
+			
+		n = len(channels)
 		if(methodName == "onlyFeedback"):
-			n = len(channels)/2
-			if(not isinstance(arg[0], list)):
-				arg = [arg]
+			if(not isinstance(channels[0], list)):
+				channels = [channels]
+			maxMeasure = convertAndExpandArgs_feedback(maxMeasure, n)
+			print("MIN")
+			minMeasure = convertAndExpandArgs_feedback(minMeasure, n)
+
+			print(channels, samplerate, maxMeasure, minMeasure)
+
+			for pair in maxMeasure:
+				for V in pair:
+					if(not -10 < V <= 10):
+						print("WARNING: maxMeasure  must be > -10 and <= 10 (for the myDAQ)")
+			for pair in minMeasure:
+				for V in pair:
+					if(not 10 > V >= -10):
+						print("WARNING: minMeasure  must be <= -10 and < 10 (for the myDAQ)")
+			for pairMax, pairMin in zip (maxMeasure, minMeasure):
+				for Vmax, Vmin in zip(pairMax, pairMin):
+					if(not Vmax > Vmin):
+						print("WARNING: Vmax must be larger then Vmin")
+
 		else:
-			n = len(channels)
 			channels = convertAndExpandArgs(channels, n)
 			self.inputChannels = channels
 		
 			maxMeasure = convertAndExpandArgs(maxMeasure, n)
 			minMeasure = convertAndExpandArgs(minMeasure, n)
 
-		for V in maxMeasure:
-			if(not -10 < V <= 10):
-				print("WARNING: maxMeasure  must be > -10 and <= 10 (for the myDAQ)")
-		for V in minMeasure:
-			if(not 10 > V >= -10):
-				print("WARNING: minMeasure  must be <= -10 and < 10 (for the myDAQ)")
-		for Vmax, Vmin in zip(maxMeasure, minMeasure):
-			if(not Vmax > Vmin):
-				print("WARNING: Vmax must be larger then Vmin")
+			for V in maxMeasure:
+				if(not -10 < V <= 10):
+					print("WARNING: maxMeasure  must be > -10 and <= 10 (for the myDAQ)")
+			for V in minMeasure:
+				if(not 10 > V >= -10):
+					print("WARNING: minMeasure  must be <= -10 and < 10 (for the myDAQ)")
+			for Vmax, Vmin in zip(maxMeasure, minMeasure):
+				if(not Vmax > Vmin):
+					print("WARNING: Vmax must be larger then Vmin")
+		
 		if(not 0 < samplerate <= 200000):
 			print("WARNING: samplerate must be > 0 and <=200000 (for the myDAQ)")
 
 		self.plot = plot
 		self.saveData = saveData
+		self.nChannelsInData = len(channels)
 
 		#check if the inputs are valid
 		for channel in channels:

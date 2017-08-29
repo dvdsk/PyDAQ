@@ -5,25 +5,23 @@ import numpy as np
 
 #een feedback funct
 def transferFunct(buffer, feedbackSig):
-	V = buffer.access()[-1]
+	lenEven = len(buffer)//2*2
+	V = buffer.access()[lenEven-2]
 	R = V/((5-V)/1000)
-	# print("V: ",V,"R: ",R)
 	if(R > 822.5):
-		feedbackSig += 0.1
+		feedbackSig[0] += 0.1
 	else:
-		feedbackSig -= 0.1
-	# print("feedbackSig:",feedbackSig)
+		feedbackSig[0] += 0.1
+		
+	feedbackSig = np.clip(feedbackSig, -10, 10)
 	return feedbackSig
 
 outputShape = np.sin(np.linspace(0, 2*np.pi, num =2000, endpoint=False, dtype=np.float64))
 
-"myDAQ1/ao0"
-"myDAQ1/ai0"
-
 if __name__ == '__main__':
 	pd = pd.PyDAQ()
 	
-	pd.onlyFeedback(["myDAQ1/ai1", "myDAQ1/ao1"], transferFunct)
+	pd.onlyFeedback([["myDAQ1/ai1", "myDAQ1/ao1"],["myDAQ1/ai0", "myDAQ1/ao0"]], transferFunct)
 	#pd.onlyGen(["myDAQ1/ao1", "myDAQ1/ao0"], outputShape)
 	#pd.onlyAquire("myDAQ1/ai1", maxMeasure=2)
 	#pd.aquireAndGen("myDAQ1/ai1", "myDAQ1/ao1", outputShape)

@@ -77,15 +77,14 @@ class WriteTask(Task):
 
 def feedback(input_write_ends, stop, rdy, transferFunct, channels, samplerate, maxMeasure, minMeasure):
 	buffer = circularNumpyBuffer(10000, dtype=np.float64) #TODO expose to user (len)
-	data = np.empty(100, dtype=np.float64)
+	data = np.empty(samplerate, dtype=np.float64)
 	sampsWritten = int32()
 	sampsRead = int32()
 	
-	sendbuf = np.empty(samplerate*2)
+	sendbuf = np.empty(200*2)
 	start_idx = 0
 
 	t0 = time.time()
-	print(channels, samplerate, maxMeasure, minMeasure)
 	for channelPair, maxMeasurePair, minMeasurePair, in zip(channels, maxMeasure, minMeasure):
 		readTask = ReadTask(channelPair[0], samplerate, maxMeasurePair[0], minMeasurePair[0])
 		writeTask = WriteTask(channelPair[1], maxMeasurePair[1], minMeasurePair[1])
@@ -93,42 +92,45 @@ def feedback(input_write_ends, stop, rdy, transferFunct, channels, samplerate, m
 		print("errors detected, not starting readout!!")
 		return 
 	
-	feedbackSig = np.array([0], dtype=np.float64)#H(buffer.access)
-	n= 0
+	feedbackSig = np.full(len(channels), 0, dtype=np.float64)
+	start_idx= 0
 	rdy.set()
 	
 	while(not stop.wait(0)):
 		t0
 		t1 = time.time()
-		#print("latency:",t1-t0)
+		if(t1-t0 >0.011):
+			print("latency:",t1-t0)
 		readTask.ReadAnalogF64(
 			DAQmx_Val_Auto, #read as many samples as there are in the buffer
 			0, #timeout in seconds
 			DAQmx_Val_GroupByScanNumber, #read entire channel in one go
 			data, #array where the samples should be put in
-			100, #number of samples
+			200, #number of samples
 			byref(sampsRead), #reference where to store: numb of samples read
 			None)
 		if(sampsRead.value != 0): 
 			buffer.append(data[0:sampsRead.value])
-			if(n == 200):
+			if(start_idx > 200-1):
+				print("sending")
+				start_idx_even = start_idx//2*2 #round down to even number
+				tosend = sendbuf[0:start_idx_even]
+				tosend = tosend.reshape(len(channels), len(tosend)//len(channels))
 				for write_end in input_write_ends:
-					write_end.send(sendbuf[0:start_idx])
-				start_idx=0
-				n=0
+					write_end.send(tosend)
+				start_idx -= start_idx_even
 			else:
+				print(sampsRead.value)
 				sendbuf[start_idx:start_idx+sampsRead.value] = data[0:sampsRead.value]
 				start_idx+=sampsRead.value
-				n+=1
 			
 			#TODO check needed?
-			feedbackSig[0] = np.clip(transferFunct(buffer, feedbackSig[0]), 0, 10)
-			feedbackSig = np.clip(transferFunct(buffer, feedbackSig[0]), 0, 10)
+			feedbackSig = transferFunct(buffer, feedbackSig)
 			writeTask.WriteAnalogF64(
-				channels//2, #number of samples to write
+				1, #number of samples to write per channel
 				True, #start output automatically
 				1, #timeout to wait for funct to write samples 
-				DAQmx_Val_GroupByChannel, #read entire channel in one go
+				DAQmx_Val_GroupByScanNumber, #read entire channel in one go
 				feedbackSig, #source array from which to write the data
 				byref(sampsWritten),  #variable to store the numb of written samps in
 				None)
@@ -138,11 +140,11 @@ def feedback(input_write_ends, stop, rdy, transferFunct, channels, samplerate, m
 	#start by setting the output signal to zero
 	writeTask.StopTask()
 	writeTask.WriteAnalogF64(
-		1, #number of samples to write
+		1, #number of samples to write per channel
 		True, #start output automatically
 		1, #timeout to wait for funct to write samples 
 		DAQmx_Val_GroupByChannel, #read entire channel in one go
-		np.array([0], dtype=np.float64), #source array from which to write the data
+		np.full(len(channels), 0, dtype=np.float64), #source array from which to write the data
 		byref(sampsWritten),  #variable to store the numb of written samps in
 		None)
 	
