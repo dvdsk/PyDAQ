@@ -118,25 +118,26 @@ class ReadToTwoPipes(ReadCallbackTask):
 		return 0 # The function should return an integer
 
 class WriteTask(Task):
-	def __init__(self, outputChannel, outputData, samplerate, maxMeasure, minMeasure):
+	def __init__(self, outputChannels, outputData, samplerate, maxMeasure, minMeasure):
 		Task.__init__(self)
 		self.sampswritten = int32()
 		self.a = []
 		self.rdy = True
-		try:
-			#configurate output channel, this is the signal the myDAQ outputs
-			self.CreateAOVoltageChan(
-				outputChannel, #The name of the physical channel muDAQ1/aiN  (n= 0 or 1)
-				"", #name to assign to virt channel mapped to phys channel above
-				minMeasure, #min value expected to output
-				maxMeasure, #max value expected to output
-				DAQmx_Val_Volts, #units for min val and max val
-				None) #name of custom scale if used
-		except DAQError:
-			print("CRITICAL: INCORRECT outputChannel ("+outputChannel+"), is there a mydaq connected?, "
-			     +"are you specifing an outputChannel?")
-			self.rdy = False
-			return
+		for outputChannel, maxMeasure, minMeasure in zip(outputChannels, maxMeasure, minMeasure):
+			try:
+				#configurate output channel, this is the signal the myDAQ outputs
+				self.CreateAOVoltageChan(
+					outputChannel, #The name of the physical channel muDAQ1/aiN  (n= 0 or 1)
+					"", #name to assign to virt channel mapped to phys channel above
+					minMeasure, #min value expected to output
+					maxMeasure, #max value expected to output
+					DAQmx_Val_Volts, #units for min val and max val
+					None) #name of custom scale if used
+			except DAQError:
+				print("CRITICAL: INCORRECT outputChannel ("+outputChannel+"), is there a mydaq connected?, "
+					 +"are you specifing an outputChannel?")
+				self.rdy = False
+				return
 		
 		#configurate timing and sample rate for the samples
 		self.CfgSampClkTiming(
@@ -146,7 +147,7 @@ class WriteTask(Task):
 			DAQmx_Val_ContSamps, #generate continues until task stopped
 			len(outputData)) #numb to generate if finitSamps/ bufferSize if contSamps (bufsize in this case)
 		self.WriteAnalogF64(
-			len(outputData), #number of samples to write
+			len(outputData)//len(outputChannels), #number of samples to write
 			False, #start output automatically
 			DAQmx_Val_WaitInfinitely, #timeout to wait for funct to write samples 
 			DAQmx_Val_GroupByChannel, #read entire channel in one go
@@ -179,11 +180,11 @@ def startReadOnly(input_write_ends, stop, rdy,
 	else:
 		print(inputChannel+": closed")
 
-def startGenOnly(output_read_end, stop, rdy, outputChannel,
+def startGenOnly(output_read_end, stop, rdy, outputChannels,
 				 outputShape, samplerate, maxMeasure, minMeasure):
 
 	sampswritten = int32()
-	writeInTask=WriteTask(outputChannel, outputShape, samplerate, maxMeasure, minMeasure)
+	writeInTask=WriteTask(outputChannels, outputShape, samplerate, maxMeasure, minMeasure)
 	if(writeInTask.rdy == False):
 		print("errors detected, not starting generation!!")
 		return 
@@ -196,14 +197,14 @@ def startGenOnly(output_read_end, stop, rdy, outputChannel,
 	while(not stop.wait(1)):
 		if(output_read_end.poll()):
 			print("updating output waveform")
-			outputData = output_read_end.recv()
+			outputData = output_read_end.recv() #for 2 channels supply 2*200 
 			print(outputData)
 			writeInTask.StopTask()
 			writeInTask.WriteAnalogF64(
-				200, #number of samples to write
+				len(outputData)/len(outputChannels), #number of samples to write
 				True, #start output automatically
 				DAQmx_Val_WaitInfinitely, #timeout to wait for funct to write samples 
-				DAQmx_Val_GroupByChannel, #read entire channel in one go
+				DAQmx_Val_GroupByChannel, #write entire channel in one go
 				outputData, #source array from which to write the data
 				byref(sampswritten), #variable to store the numb of written samps in
 				None)
@@ -217,17 +218,17 @@ def startGenOnly(output_read_end, stop, rdy, outputChannel,
 		2, #number of samples to write
 		True, #start output automatically
 		1, #timeout to wait for funct to write samples 
-		DAQmx_Val_GroupByChannel, #read entire channel in one go
+		DAQmx_Val_GroupByChannel, #write entire channel in one go
 		np.array([0,0], dtype=np.float64), #source array from which to write the data
 		byref(sampswritten),  #variable to store the numb of written samps in
 		None)
 
 	writeInTask.StopTask()
 	writeInTask.ClearTask()
-	if(isinstance(outputChannel, list)):
-		print(", ".join(outputChannel, )+": closed")
+	if(isinstance(outputChannels, list)):
+		print(", ".join(outputChannels, )+": closed and reset to 0 volt")
 	else:
-		print(outputChannel+": closed and reset to 0 volt")
+		print(outputChannels+": closed and reset to 0 volt")
 
 def startReadAndGen(input_write_end, output_read_end, stop, rdy, outputChannel,
 	                outputShape, inputChannel, samplerate, maxMeasure, minMeasure):

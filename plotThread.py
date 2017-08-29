@@ -35,6 +35,7 @@ def waitForData(read_end, stop):
 	while(not read_end.poll(0.1)):
 		if(stop.is_set()):
 			return
+	print("getting data")
 
 def setupLivePlot(ax, fig):
 	canvas = ax.figure.canvas
@@ -66,7 +67,7 @@ def plot(read_end, stop, bufferLen=100000):
 	#this buffer is used to keep the last 'bufferLen' points
 	#that have been send from the mydaq for plotting
 	buffer1 = circularNumpyBuffer(bufferLen, np.float64)
-	buffer2 = circularNumpyBuffer(bufferLen, np.float64)
+	#buffer2 = circularNumpyBuffer(bufferLen, np.float64)
 	
 	#the x axis is just the number of points for now
 	x = np.linspace(0, bufferLen, num=bufferLen)
@@ -74,8 +75,8 @@ def plot(read_end, stop, bufferLen=100000):
 
 	waitForData(read_end, stop)
 	data = read_end.recv()#get the data
-	buffer1.append(data[0,:])   #append it to the buffer
-	buffer2.append(data[1,:])   #append it to the buffer
+	buffer1.append(data)   #append it to the buffer
+	#buffer2.append(data[1,:])   #append it to the buffer
 	
 	#Start the plot
 	fig = plt.figure()
@@ -87,15 +88,15 @@ def plot(read_end, stop, bufferLen=100000):
 	#add a new plot line (works just like plt.plot)
 	#another possibility would be plt.scatter
 	lines["plot1"], = ax.plot(buffer1.access(), x[:len(buffer1)])
-	lines["plot2"], = ax.plot(buffer2.access(), x[:len(buffer2)])
+	#lines["plot2"], = ax.plot(buffer2.access(), x[:len(buffer2)])
 	
 	#keep updating the plot until the program stops
 	while(not stop.is_set()):
 		#if there is new data, update the x and y data of the plots
 		if(read_end.poll()):
 			data = read_end.recv() #get the new data
-			buffer1.append(data[0,:]) #append it to the buffer
-			buffer2.append(data[1,:]) #append it to the buffer
+			buffer1.append(data) #append it to the buffer
+			#buffer2.append(data[1,:]) #append it to the buffer
 			
 			#send all the data (that now includes the new
 			#data we recieved above ) to matplotlib. Do
@@ -103,8 +104,8 @@ def plot(read_end, stop, bufferLen=100000):
 			lines["plot1"].set_ydata(buffer1.access())
 			lines["plot1"].set_xdata(x[:len(buffer1)])
 
-			lines["plot2"].set_ydata(buffer2.access())
-			lines["plot2"].set_xdata(x[:len(buffer2)])
+			#lines["plot2"].set_ydata(buffer2.access())
+			#lines["plot2"].set_xdata(x[:len(buffer2)])
 
 			#update the view
 			updateLivePlot(cachedPlotData,ax, fig, lines)

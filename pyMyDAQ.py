@@ -37,14 +37,15 @@ def testIfName():
 	if(not cv.is_set()):
 		sys.exit()
 
+
 class PyDAQ:
 	"""description"""
 	def __init__(self):
 		testIfName()
 		
 		self.stop = mp.Event()
-		self.plot = None
-		self.saveData = None
+		self.plot = False
+		self.saveData = False
 		self.configDone = False
 		
 		self.inputToPlot_write_end, self.inputToPlot_read_end = mp.Pipe()
@@ -54,7 +55,13 @@ class PyDAQ:
 		
 		self.processes = {}
 		self.rdy = {} 
+		self.inputChannels = []
 		self.activeChannels = {}
+
+	def checkConfig(self):
+		if(self.configDone):
+			print("you can not combine or use multiple of:  'onlyAquire', 'onlyGen', 'aquireAndGen', 'onlyFeedback'")
+			return
 
 	def setupInputPipes(self, plot, saveData):
 		inputPipes = []
@@ -65,9 +72,7 @@ class PyDAQ:
 		return inputPipes
 
 	def onlyAquire(self, inputChannels, plot=True, saveData=True, samplerate=1000, maxMeasure=[10,10], minMeasure=[-10,-10]):
-		if(self.configDone):
-			print("you can not combine or use multiple of:  'onlyAquire', 'onlyGen', 'aquireAndGen', 'onlyFeedback'")
-			return
+		self.checkConfig()
 		maxMeasure, minMeasure, inputChannels = self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, inputChannels, "aquire", plot, saveData)
 		self.rdy["aquisition"] = mp.Event()
 		self.processes["aquisition"] = mp.Process(target = simpleRead.startReadOnly, 
@@ -76,14 +81,13 @@ class PyDAQ:
 		self.configDone = True
 		return
 
-	def onlyGen(self, outputChannel, outputShape, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
-		if(self.configDone):
-			return
-		self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, [outputChannel], "gen")
+	def onlyGen(self, outputChannels, outputShape, samplerate=1000, maxMeasure=[10,10], minMeasure=[-10,-10]):
+		self.checkConfig()
+		maxMeasure, minMeasure, outputChannels = self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, outputChannels, "gen", False, False)
 		self.rdy["gen"] = mp.Event()
 		self.processes["gen"] = mp.Process(target = simpleRead.startGenOnly, 
-			 args = (self.output_read_end, self.stop, self.rdy["gen"], outputChannel, outputShape,
-			 plot, saveData, samplerate, maxMeasure, minMeasure,)) 
+			 args = (self.output_read_end, self.stop, self.rdy["gen"], outputChannels, outputShape,
+			 samplerate, maxMeasure, minMeasure,)) 
 		self.configDone = True
 		return
  
@@ -101,14 +105,14 @@ class PyDAQ:
 		self.configDone = True
 		return
 
-	def onlyFeedback(self, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
+	def onlyFeedback(self, channels, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
 		if(self.configDone):
 			return
-		self.checkIfValidArgs(samplerate, maxMeasure, minMeasure,  "feedback")
-		self.rdy["feedback"] = mp.Event()
+		maxMeasure, minMeasure, channels = self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, channels, "onlyFeedback", plot, saveData)
+		print("samplerate: ",samplerate)
+		self.rdy["onlyFeedback"] = mp.Event()
 		self.processes["feedback"] = mp.Process(target = feedback.feedback, 
-			 args = (self.input_write_end, self.stop, transferFunct,inputChannel, 
-			         outputChannel, plot, saveData, samplerate, maxMeasure, minMeasure,))
+			 args = (self.setupInputPipes(plot, saveData), self.stop, self.rdy["onlyFeedback"], transferFunct, channels, samplerate, maxMeasure, minMeasure,))
 		self.configDone = True
 		return
 
@@ -138,6 +142,7 @@ class PyDAQ:
 		for rdy in self.rdy.values():
 			# if(rdy is not None):
 			rdy.wait()
+		print("begin done\n")
 
 	def menu(self):
 		input('Press Enter to stop\n')
@@ -145,7 +150,6 @@ class PyDAQ:
 	def end(self):
 		self.stop.set()
 		for processName, process in self.processes.items():
-			# if(process is not None):
 			process.join()
 			print("{0:15} {1}".format(processName+":", "stopped"))
 	
@@ -154,14 +158,22 @@ class PyDAQ:
 		def convertAndExpandArgs(arg, n):
 			if(not isinstance(arg, list)):
 				arg = [arg]
-			while(n < len(arg)):
+			while(n > len(arg)):
 				arg.append(arg[-1])
 			return arg
 
-		n = len(channels)
-		channels = convertAndExpandArgs(channels, n)
-		maxMeasure = convertAndExpandArgs(maxMeasure, n)
-		minMeasure = convertAndExpandArgs(minMeasure, n)
+		n = 1
+		if(methodName == "onlyFeedback"):
+			n = len(channels)/2
+			if(not isinstance(arg[0], list)):
+				arg = [arg]
+		else:
+			n = len(channels)
+			channels = convertAndExpandArgs(channels, n)
+			self.inputChannels = channels
+		
+			maxMeasure = convertAndExpandArgs(maxMeasure, n)
+			minMeasure = convertAndExpandArgs(minMeasure, n)
 
 		for V in maxMeasure:
 			if(not -10 < V <= 10):

@@ -7,12 +7,12 @@ import numpy as np
 def transferFunct(buffer, feedbackSig):
 	V = buffer.access()[-1]
 	R = V/((5-V)/1000)
-	print("V: ",V,"R: ",R)
+	# print("V: ",V,"R: ",R)
 	if(R > 822.5):
 		feedbackSig += 0.1
 	else:
 		feedbackSig -= 0.1
-	print("feedbackSig:",feedbackSig)
+	# print("feedbackSig:",feedbackSig)
 	return feedbackSig
 
 outputShape = np.sin(np.linspace(0, 2*np.pi, num =2000, endpoint=False, dtype=np.float64))
@@ -23,9 +23,9 @@ outputShape = np.sin(np.linspace(0, 2*np.pi, num =2000, endpoint=False, dtype=np
 if __name__ == '__main__':
 	pd = pd.PyDAQ()
 	
-	#pd.feedback(transferFunct)
-	#pd.gen("myDAQ1/ao1", outputShape)
-	pd.onlyAquire(["myDAQ1/ai1","myDAQ1/ai0"], maxMeasure=2)
+	pd.onlyFeedback(["myDAQ1/ai1", "myDAQ1/ao1"], transferFunct)
+	#pd.onlyGen(["myDAQ1/ao1", "myDAQ1/ao0"], outputShape)
+	#pd.onlyAquire("myDAQ1/ai1", maxMeasure=2)
 	#pd.aquireAndGen("myDAQ1/ai1", "myDAQ1/ao1", outputShape)
 
 	

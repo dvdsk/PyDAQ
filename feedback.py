@@ -39,7 +39,8 @@ class ReadTask(Task):
 				DAQmx_Val_Volts, #units for min val and max val
 				None) #name of custom scale if used
 		except DAQError:
-			print("CRITICAL: NO MYDAQ DETECTED, is there a mydaq connected?")
+			print("CRITICAL: INCORRECT inputChannel ("+inputChannel+"), is there a mydaq connected?, "
+				 +"are you specifing an inputChannel?")
 			self.rdy = False
 			return
 			
@@ -68,31 +69,34 @@ class WriteTask(Task):
 				DAQmx_Val_Volts, #units for min val and max val
 				None) #name of custom scale if used
 		except DAQError:
-			print("CRITICAL: NO MYDAQ DETECTED, is there a mydaq connected?")
+			print("CRITICAL: INCORRECT outputChannel ("+outputChannel+"), is there a mydaq connected?, "
+				 +"are you specifing an outputChannel?")
 			self.rdy = False
 			return
-		#not configuring sample timing -> driver in on demand sample for anolog out
+#not configuring sample timing -> driver in on demand sample for anolog out
 
-
-def feedback(write_end, stop, transferFunct, inputChannel, 
-outputChannel, samplerate, maxMeasure, minMeasure):
+def feedback(input_write_ends, stop, rdy, transferFunct, channels, samplerate, maxMeasure, minMeasure):
 	buffer = circularNumpyBuffer(10000, dtype=np.float64) #TODO expose to user (len)
 	data = np.empty(100, dtype=np.float64)
 	sampsWritten = int32()
 	sampsRead = int32()
 	
-	sendbuf = np.empty(2000)
+	sendbuf = np.empty(samplerate*2)
 	start_idx = 0
 
 	t0 = time.time()
-	writeTask = WriteTask(outputChannel, maxMeasure, minMeasure)
-	readTask = ReadTask(inputChannel, samplerate, maxMeasure, minMeasure)
+	print(channels, samplerate, maxMeasure, minMeasure)
+	for channelPair, maxMeasurePair, minMeasurePair, in zip(channels, maxMeasure, minMeasure):
+		readTask = ReadTask(channelPair[0], samplerate, maxMeasurePair[0], minMeasurePair[0])
+		writeTask = WriteTask(channelPair[1], maxMeasurePair[1], minMeasurePair[1])
 	if(readTask.rdy == False or writeTask.rdy == False):
 		print("errors detected, not starting readout!!")
 		return 
 	
 	feedbackSig = np.array([0], dtype=np.float64)#H(buffer.access)
 	n= 0
+	rdy.set()
+	
 	while(not stop.wait(0)):
 		t0
 		t1 = time.time()
@@ -100,7 +104,7 @@ outputChannel, samplerate, maxMeasure, minMeasure):
 		readTask.ReadAnalogF64(
 			DAQmx_Val_Auto, #read as many samples as there are in the buffer
 			0, #timeout in seconds
-			DAQmx_Val_GroupByChannel, #read entire channel in one go
+			DAQmx_Val_GroupByScanNumber, #read entire channel in one go
 			data, #array where the samples should be put in
 			100, #number of samples
 			byref(sampsRead), #reference where to store: numb of samples read
@@ -108,7 +112,8 @@ outputChannel, samplerate, maxMeasure, minMeasure):
 		if(sampsRead.value != 0): 
 			buffer.append(data[0:sampsRead.value])
 			if(n == 200):
-				write_end.send(sendbuf[0:start_idx])
+				for write_end in input_write_ends:
+					write_end.send(sendbuf[0:start_idx])
 				start_idx=0
 				n=0
 			else:
@@ -116,11 +121,11 @@ outputChannel, samplerate, maxMeasure, minMeasure):
 				start_idx+=sampsRead.value
 				n+=1
 			
+			#TODO check needed?
 			feedbackSig[0] = np.clip(transferFunct(buffer, feedbackSig[0]), 0, 10)
-			#feedbackSig[0] = 1;
-			print("feedbacksig:",feedbackSig)
+			feedbackSig = np.clip(transferFunct(buffer, feedbackSig[0]), 0, 10)
 			writeTask.WriteAnalogF64(
-				1, #number of samples to write
+				channels//2, #number of samples to write
 				True, #start output automatically
 				1, #timeout to wait for funct to write samples 
 				DAQmx_Val_GroupByChannel, #read entire channel in one go
@@ -128,6 +133,7 @@ outputChannel, samplerate, maxMeasure, minMeasure):
 				byref(sampsWritten),  #variable to store the numb of written samps in
 				None)
 			t0 = t1
+
 	#shutdown routine
 	#start by setting the output signal to zero
 	writeTask.StopTask()
