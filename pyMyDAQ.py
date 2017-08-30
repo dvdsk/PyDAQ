@@ -106,14 +106,14 @@ class PyDAQ:
 		self.configDone = True
 		return
 
-	def onlyFeedback(self, channels, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
+	def onlyFeedback(self, inputChannels, outputChannels, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
 		if(self.configDone):
 			return
-		maxMeasure, minMeasure, channels = self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, channels, "onlyFeedback", plot, saveData)
+		inputChannels, outputChannels, maxMeasure, minMeasure = self.checkIfValidArgs_fb(samplerate, maxMeasure, minMeasure, inputChannels, outputChannels, "onlyFeedback", plot, saveData)
 		print("samplerate: ",samplerate)
 		self.rdy["onlyFeedback"] = mp.Event()
 		self.processes["feedback"] = mp.Process(target = feedback.feedback, 
-			 args = (self.setupInputPipes(plot, saveData), self.stop, self.rdy["onlyFeedback"], transferFunct, channels, samplerate, maxMeasure, minMeasure,))
+			 args = (self.setupInputPipes(plot, saveData), self.stop, self.rdy["onlyFeedback"], transferFunct, inputChannels, outputChannels, samplerate, maxMeasure, minMeasure,))
 		self.configDone = True
 		return
 
@@ -150,7 +150,49 @@ class PyDAQ:
 		for processName, process in self.processes.items():
 			process.join()
 			print("{0:15} {1}".format(processName+":", "stopped"))
-	
+
+	def checkIfValidArgs_fb(self, samplerate, maxMeasure, minMeasure, inputChannels, outputChannels, methodName, plot, saveData):
+		
+		def convertAndExpandArgs(arg, nIn, nOut):
+			toReturn = []
+			if(not isinstance(arg, list)): #x, x
+				toReturn.append([arg] * nIn)
+				toReturn.append([arg] * nOut)
+			elif(not isinstance(arg[0], list)): #[x,x]
+				toReturn.append(arg[0] * nIn)
+				toReturn.append(arg[1] * nOut)
+			return toReturn
+		
+		if(not isinstance(inputChannels, list)):
+			inputChannels = [inputChannels]
+		if(not isinstance(outputChannels, list)):
+			outputChannels = [outputChannels]
+		maxMeasure = convertAndExpandArgs(maxMeasure, len(inputChannels), len(outputChannels))
+		minMeasure = convertAndExpandArgs(minMeasure, len(inputChannels), len(outputChannels))
+
+		for pair in maxMeasure:
+			for V in pair:
+				if(not -10 < V <= 10):
+					print("WARNING: maxMeasure  must be > -10 and <= 10 (for the myDAQ)")
+		for pair in minMeasure:
+			for V in pair:
+				if(not 10 > V >= -10):
+					print("WARNING: minMeasure  must be <= -10 and < 10 (for the myDAQ)")
+		for pairMax, pairMin in zip (maxMeasure, minMeasure):
+			for Vmax, Vmin in zip(pairMax, pairMin):
+				if(not Vmax > Vmin):
+					print("WARNING: Vmax must be larger then Vmin")
+
+		if(not 0 < samplerate <= 200000):
+			print("WARNING: samplerate must be > 0 and <=200000 (for the myDAQ)")
+
+		self.plot = plot
+		self.saveData = saveData
+		self.nChannelsInData = len(inputChannels)
+		print(inputChannels, outputChannels, maxMeasure, minMeasure)
+		return inputChannels, outputChannels, maxMeasure, minMeasure
+
+
 	def checkIfValidArgs(self, samplerate, maxMeasure, minMeasure, channels, methodName, plot, saveData):
 		
 		def convertAndExpandArgs(arg, n):
@@ -160,74 +202,29 @@ class PyDAQ:
 				arg.append(arg[-1])
 			return arg
 
-		def convertAndExpandArgs_feedback(arg, n):
-			toReturn = []
-			if(not isinstance(arg, list)): #x, x
-				for i in range(n-1):
-					print("appending",toReturn)
-					toReturn.append([arg, arg])
-			elif(not isinstance(arg[0], list)): #[x,x]
-				toReturn.append(arg)
-			return toReturn
-			
+		
 		n = len(channels)
-		if(methodName == "onlyFeedback"):
-			if(not isinstance(channels[0], list)):
-				channels = [channels]
-			maxMeasure = convertAndExpandArgs_feedback(maxMeasure, n)
-			print("MIN")
-			minMeasure = convertAndExpandArgs_feedback(minMeasure, n)
+		channels = convertAndExpandArgs(channels, n)
+		self.inputChannels = channels
+	
+		maxMeasure = convertAndExpandArgs(maxMeasure, n)
+		minMeasure = convertAndExpandArgs(minMeasure, n)
 
-			print(channels, samplerate, maxMeasure, minMeasure)
-
-			for pair in maxMeasure:
-				for V in pair:
-					if(not -10 < V <= 10):
-						print("WARNING: maxMeasure  must be > -10 and <= 10 (for the myDAQ)")
-			for pair in minMeasure:
-				for V in pair:
-					if(not 10 > V >= -10):
-						print("WARNING: minMeasure  must be <= -10 and < 10 (for the myDAQ)")
-			for pairMax, pairMin in zip (maxMeasure, minMeasure):
-				for Vmax, Vmin in zip(pairMax, pairMin):
-					if(not Vmax > Vmin):
-						print("WARNING: Vmax must be larger then Vmin")
-
-		else:
-			channels = convertAndExpandArgs(channels, n)
-			self.inputChannels = channels
-		
-			maxMeasure = convertAndExpandArgs(maxMeasure, n)
-			minMeasure = convertAndExpandArgs(minMeasure, n)
-
-			for V in maxMeasure:
-				if(not -10 < V <= 10):
-					print("WARNING: maxMeasure  must be > -10 and <= 10 (for the myDAQ)")
-			for V in minMeasure:
-				if(not 10 > V >= -10):
-					print("WARNING: minMeasure  must be <= -10 and < 10 (for the myDAQ)")
-			for Vmax, Vmin in zip(maxMeasure, minMeasure):
-				if(not Vmax > Vmin):
-					print("WARNING: Vmax must be larger then Vmin")
-		
+		for V in maxMeasure:
+			if(not -10 < V <= 10):
+				print("WARNING: maxMeasure  must be > -10 and <= 10 (for the myDAQ)")
+		for V in minMeasure:
+			if(not 10 > V >= -10):
+				print("WARNING: minMeasure  must be <= -10 and < 10 (for the myDAQ)")
+		for Vmax, Vmin in zip(maxMeasure, minMeasure):
+			if(not Vmax > Vmin):
+				print("WARNING: Vmax must be larger then Vmin")
+	
 		if(not 0 < samplerate <= 200000):
 			print("WARNING: samplerate must be > 0 and <=200000 (for the myDAQ)")
 
 		self.plot = plot
 		self.saveData = saveData
 		self.nChannelsInData = len(channels)
-
-		#check if the inputs are valid
-		for channel in channels:
-			if(type(channel) == str()):
-				if(channel in self.activeChannels.keys()):
-					print("ERROR: channel ("+channel+") is already in use by: "+
-					self.activeChannels[channel][methodName]+"!")
-				else:
-					self.activeChannels[channel] = {}
-					self.activeChannels[channel]["methodName"][methodName]
-					self.activeChannels[channel]["sampleRate"][samplerate]
-					self.activeChannels[channel]["maxMeasure"][maxMeasure]
-					self.activeChannels[channel]["minMeasure"][minMeasure]
 
 		return maxMeasure, minMeasure, channels

@@ -75,7 +75,7 @@ def plot(read_end, stop, nChannelsInData, bufferLen=100000):
 	print("STARTING THE WAIT")
 	waitForData(read_end, stop)
 	data = read_end.recv()#get the data
-	buffer1.append(data[0,:])  #append it to the buffer
+	buffer1.append(data[:,0])  #append it to the buffer
 	#buffer2.append(data[1,:])   #append it to the buffer
 	
 	#Start the plot
@@ -95,7 +95,7 @@ def plot(read_end, stop, nChannelsInData, bufferLen=100000):
 		#if there is new data, update the x and y data of the plots
 		if(read_end.poll()):
 			data = read_end.recv()#get the data
-			buffer1.append(data[0,:]) 
+			buffer1.append(data[:,0])
 			#buffer2.append(data[1,:]) #append it to the buffer
 			
 			#send all the data (that now includes the new
