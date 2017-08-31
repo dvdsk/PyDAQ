@@ -14,7 +14,7 @@ def transferFunct(buffer, feedbackSig):
 		feedbackSig[0] += 0.1
 	
 	feedbackSig[0] = 10
-	feedbackSig[1] = 10
+	# feedbackSig[1] = 10
 	feedbackSig = np.clip(feedbackSig, -10, 10)
 	return feedbackSig
 
@@ -25,7 +25,8 @@ if __name__ == '__main__':
 	
 	pd = pd.PyDAQ()
 	
-	pd.onlyFeedback(["myDAQ1/ai1", "myDAQ1/ai0"],["myDAQ1/ao1", "myDAQ1/ao0"], transferFunct)
+	#pd.onlyFeedback(["myDAQ1/ai1", "myDAQ1/ai0"],["myDAQ1/ao1", "myDAQ1/ao0"], transferFunct)
+	#pd.onlyFeedback("myDAQ1/ai1","myDAQ1/ao1", transferFunct)
 	#pd.onlyGen(["myDAQ1/ao1", "myDAQ1/ao0"], outputShape)
 	#pd.onlyAquire("myDAQ1/ai1", maxMeasure=2)
 	#pd.aquireAndGen("myDAQ1/ai1", "myDAQ1/ao1", outputShape)
