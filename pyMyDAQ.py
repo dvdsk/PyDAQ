@@ -1,4 +1,6 @@
-"""MAIN FILE"""
+"""
+This module provides a high level interface to the myDAQ. It can be used to aquire and/or generate signals on multiple channels or for feedback between channels, for this a custom feedback function needs to be passed. By default the aquired signals will be plotted and saved to file. If desired custom plot function can be provided. 
+"""
 import multiprocessing as mp
 import threading
 import numpy as np
@@ -39,14 +41,21 @@ def testIfName():
 
 
 class PyDAQ:
-	"""description"""
+	"""class used for access to the mydaq, only one object of this class should be created"""
 	def __init__(self):
 		testIfName()
 		
 		self.stop = mp.Event()
 		self.plot = False
+		self.plotFunct = None
+		self.plotHistory = 100000
+		self.samplerate = 0
 		self.nChannelsInData = 1
 		self.saveData = False
+		self.saveDataFormat = "csv"
+		self.saveDataFilename = "data"
+		
+		
 		self.configDone = False
 		
 		self.inputToPlot_write_end, self.inputToPlot_read_end = mp.Pipe()
@@ -61,7 +70,9 @@ class PyDAQ:
 
 	def checkConfig(self):
 		if(self.configDone):
-			print("you can not combine or use multiple of:  'onlyAquire', 'onlyGen', 'aquireAndGen', 'onlyFeedback'")
+			print("INCORRECT USAGE: you can not combine or use multiple of:")
+			print("'onlyAquire', 'onlyGen', 'aquireAndGen', 'onlyFeedback' \t\tEXITING")
+			sys.exit()
 			return
 
 	def setupInputPipes(self, plot, saveData):
@@ -73,6 +84,26 @@ class PyDAQ:
 		return inputPipes
 
 	def onlyAquire(self, inputChannels, plot=True, saveData=True, samplerate=1000, maxMeasure=[10,10], minMeasure=[-10,-10]):
+		"""Configure the mydaq to aquire signals only, this function requires
+		only one argument either a list of inputchannels as strings or a strings one inputchannel.
+		
+		For the mydaq the available input channels are: myDAQ1/ai1 and myDAQ1/ai0
+		
+		Optionally the samplerate, maxMeasurable voltage and minMeasurable
+		voltage van be set as keyword arguments. MaxMeasure and minMeasure 
+		can be passed as a single number, in which case the value is applied 
+		to both all if there are multiple. 
+		Or (when there are multiple input channels) as a list.
+		
+		A closer range between max and min measurable voltages gives a smaller error in the measurements.
+		
+		Examples:
+		  pd.onlyAquire(["myDAQ1/ai1", "myDAQ1/ai0"])
+		  pd.onlyAquire("myDAQ1/ai1")
+		  pd.onlyAquire(["myDAQ1/ai0"]) #this form is also accepted
+		  pd.onlyAquire("myDAQ1/ai1", samplerate=1000, maxMeasure=[10,10], minMeasure=[-10,-10])
+		  pd.onlyAquire("myDAQ1/ai1", samplerate=1000, maxMeasure=10, minMeasure=-10)
+		"""
 		self.checkConfig()
 		maxMeasure, minMeasure, inputChannels = self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, inputChannels, "aquire", plot, saveData)
 		self.rdy["aquisition"] = mp.Event()
@@ -95,20 +126,17 @@ class PyDAQ:
 	#TODO expand for multi channels
 	def aquireAndGen(self, inputChannels, outputChannels, outputShape, plot=True, saveData=True,
 	samplerate=1000, maxMeasure=10, minMeasure=-10):
-		if(self.configDone):
-			return
-		samplerate, maxMeasure, minMeasure = self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, 
-		inputChannels.append(outputChannels), "aquireAndGen")
+		self.checkConfig()
+		inputChannels, outputChannels, maxMeasure, minMeasure = self.checkIfValidArgs_fb(samplerate, maxMeasure, minMeasure, inputChannels, outputChannels, "onlyFeedback", plot, saveData)
+		
 		self.rdy["aquireAndGen"] = mp.Event()
 		self.processes["aquireAndGen"] = mp.Process(target = simpleRead.startReadAndGen, 
-			 args = (self.input_write_end, self.output_read_end, self.stop, self.rdy["aquireAndGen"],
-			 outputChannel[0], outputShape,inputChannel[0], plot, saveData, samplerate, maxMeasure, minMeasure))  
+			 args = (self.setupInputPipes(plot, saveData), self.output_read_end, self.stop, self.rdy["aquireAndGen"], outputChannels, outputShape,inputChannels, samplerate, maxMeasure, minMeasure))  
 		self.configDone = True
 		return
 
 	def onlyFeedback(self, inputChannels, outputChannels, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
-		if(self.configDone):
-			return
+		self.checkConfig()
 		inputChannels, outputChannels, maxMeasure, minMeasure = self.checkIfValidArgs_fb(samplerate, maxMeasure, minMeasure, inputChannels, outputChannels, "onlyFeedback", plot, saveData)
 		print("samplerate: ",samplerate)
 		self.rdy["onlyFeedback"] = mp.Event()
@@ -117,22 +145,39 @@ class PyDAQ:
 		self.configDone = True
 		return
 
-	def FeedbackAndAquire(self, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
-		pass #TODO
+	# def FeedbackAndAquire(self, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
+		# pass #TODO
 
-	def FeedbackAndGen(self, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
-		pass #TODO
+	# def FeedbackAndGen(self, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
+		# pass #TODO
 
-	def FeedbackGenAndAquire(self, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
-		pass #TODO
+	# def FeedbackGenAndAquire(self, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
+		# pass #TODO
 
+	def setCustomPlot(self, plotFunct):
+		self.plotFunct = plotFunct
+		return
+	
+	def setFileOptions(self, name="data", format="csv"):
+		self.saveDataFormat = format
+		self.saveDataFilename = name
+		
 	def begin(self):
 		if(self.plot):
-			self.processes["plotting"] = mp.Process(target = plotThread.plot, 
-			args = (self.inputToPlot_read_end, self.stop, self.nChannelsInData,))
+			if(self.plotFunct is None):
+				if(self.samplerate > self.plotHistory):
+					buflen = self.samplerate
+				else:
+					buflen = self.plotHistory
+				self.processes["plotting"] = mp.Process(target = plotThread.plot, 
+				args = (self.inputToPlot_read_end, self.stop, self.nChannelsInData,
+				buflen,))
+			else:
+				self.processes["plotting"] = mp.Process(target = self.plotFunct, 
+				args = (self.inputToPlot_read_end, self.stop, self.nChannelsInData,))
 		if(self.saveData):
 			self.processes["writeToFile"] = threading.Thread(target=plotThread.writeToFile, 
-			args=(self.stop, self.inputToFile_read_end, "test", "text"))
+			args=(self.stop, self.inputToFile_read_end, self.saveDataFilename, self.saveDataFormat))
 		for process in self.processes.values():
 			# if(process is not None):
 			process.start()
@@ -140,7 +185,6 @@ class PyDAQ:
 		for rdy in self.rdy.values():
 			# if(rdy is not None):
 			rdy.wait()
-		print("begin done\n")
 
 	def menu(self):
 		input('Press Enter to stop\n')
@@ -189,7 +233,8 @@ class PyDAQ:
 		self.plot = plot
 		self.saveData = saveData
 		self.nChannelsInData = len(inputChannels)
-		print(inputChannels, outputChannels, maxMeasure, minMeasure)
+		self.samplerate = samplerate
+		
 		return inputChannels, outputChannels, maxMeasure, minMeasure
 
 
@@ -203,7 +248,10 @@ class PyDAQ:
 			return arg
 
 		
-		n = len(channels)
+		if(not isinstance(channels, list)):
+			n = 1
+		else:
+			n = len(channels)
 		channels = convertAndExpandArgs(channels, n)
 		self.inputChannels = channels
 	
@@ -226,5 +274,6 @@ class PyDAQ:
 		self.plot = plot
 		self.saveData = saveData
 		self.nChannelsInData = len(channels)
+		self.samplerate = samplerate
 
 		return maxMeasure, minMeasure, channels

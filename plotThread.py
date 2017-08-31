@@ -7,7 +7,7 @@ import numpy as np
 from circBuff import circularNumpyBuffer
 
 def writeToFile(stop, read_end, fileName, format):
-	if(format=="text"):
+	if(format=="csv"):
 		with open(fileName+'.csv','a+b') as f_handle:
 			while(not stop.is_set()):
 				if(read_end.poll(0.1)):
@@ -17,7 +17,7 @@ def writeToFile(stop, read_end, fileName, format):
 					np.savetxt(f_handle, data, fmt='%5.3f') #print every number as 5 characters with 3 decimals (millivolts range is abs accuracy of mydaq
 				else:
 					continue
-	elif(format=="binairy"): #TODO
+	elif(format=="npy"): #TODO
 		with open(fileName+'.bin','a+b') as f_handle:
 			while(not stop.is_set()):
 				if(read_end.poll(0.1)):
@@ -25,7 +25,7 @@ def writeToFile(stop, read_end, fileName, format):
 					np.save(f_handle, data)
 				else:
 					continue
-	elif(format=="compressedBinairy"):
+	elif(format=="npz"):
 		pass #TODO
 
 # def readFromFile(fileName, format):
@@ -55,27 +55,26 @@ def updateLivePlot(axbackground, ax, fig, lines):
 	fig.canvas.restore_region(axbackground)
 
 	# redraw just the points
-	for line in lines.values():
+	for line in lines:
 		ax.draw_artist(line)
 
 	# fill in the axes rectangle, this is a trick to speed
 	# up matplotlib
 	fig.canvas.blit(ax.bbox)
 
-def plot(read_end, stop, nChannelsInData, bufferLen=100000):
+def plot(read_end, stop, nChannelsInData, bufferLen):
 	#this buffer is used to keep the last 'bufferLen' points
 	#that have been send from the mydaq for plotting
-	buffer1 = circularNumpyBuffer(bufferLen, np.float64)
-	#buffer2 = circularNumpyBuffer(bufferLen, np.float64)
+	buffers = []
+	for n in range(nChannelsInData):
+		buffers.append(circularNumpyBuffer(bufferLen, np.float64))
 	
 	#the x axis is just the number of points for now
 	x = np.linspace(0, bufferLen, num=bufferLen)
-	lines = {} #stores the data all the lines
 	waitForData(read_end, stop)
 	data = read_end.recv()#get the data
-	buffer1.append(data)  #append it to the buffer
-	# buffer1.append(data[:,0])  #append it to the buffer
-	#buffer2.append(data[1,:])   #append it to the buffer
+	for i, buffer in enumerate(buffers):
+		buffer.append(data[:,i])  #append it to the buffer
 	
 	#Start the plot
 	fig = plt.figure()
@@ -86,26 +85,25 @@ def plot(read_end, stop, nChannelsInData, bufferLen=100000):
 
 	#add a new plot line (works just like plt.plot)
 	#another possibility would be plt.scatter
-	lines["plot1"], = ax.plot(buffer1.access(), x[:len(buffer1)])
-	#lines["plot2"], = ax.plot(buffer2.access(), x[:len(buffer2)])
+	lines = []
+	for i, buffer in enumerate(buffers):
+		line, = ax.plot(buffer.access(), x[:len(buffer)])
+		lines.append(line)
 	
 	#keep updating the plot until the program stops
 	while(not stop.is_set()):
 		#if there is new data, update the x and y data of the plots
 		if(read_end.poll()):
 			data = read_end.recv()#get the data
-			buffer1.append(data)
-			# buffer1.append(data[:,0])
-			#buffer2.append(data[1,:]) #append it to the buffer
+			for i, buffer in enumerate(buffers):
+				buffer.append(data[:,i])
 			
 			#send all the data (that now includes the new
 			#data we recieved above ) to matplotlib. Do
 			#this for every plot
-			lines["plot1"].set_ydata(buffer1.access())
-			lines["plot1"].set_xdata(x[:len(buffer1)])
-
-			#lines["plot2"].set_ydata(buffer2.access())
-			#lines["plot2"].set_xdata(x[:len(buffer2)])
+			for line, buffer in zip(lines, buffers):
+				line.set_ydata(buffer.access())
+				line.set_xdata(x[:len(buffer)])
 
 			#update the view
 			updateLivePlot(cachedPlotData,ax, fig, lines)

@@ -20,7 +20,6 @@ as they will be automatically converted by ctypes
 to pass by referenceNULL in C becomes None in Python
 """
 
-
 import os
 import sys
 import textwrap
@@ -30,13 +29,11 @@ import ctypes
 import ctypes.util
 import warnings
 
-#def checkMyDAQConnection():
-
-
 class ReadCallbackTask(Task):
 	def __init__(self, inputChannels, samplerate, maxMeasures, minMeasures):
 		Task.__init__(self)
-		self.data = np.empty(samplerate)
+		# self.data = np.empty(samplerate*len(inputChannels),dtype=np.float64)
+		self.data = np.full(samplerate*len(inputChannels), 0,dtype=np.float64)
 		self.a = []
 		self.rdy = True
 		self.samplerate = samplerate
@@ -76,45 +73,45 @@ class ReadCallbackTask(Task):
 
 class ReadToOnePipe(ReadCallbackTask):
 	def __init__(self, write_end, inputChannel, samplerate, maxMeasure, minMeasure):
+		print(inputChannel, samplerate, maxMeasure, minMeasure)
 		ReadCallbackTask.__init__(self, inputChannel, samplerate, maxMeasure, minMeasure)
 		self.write_end = write_end #transport pipe to other process
 		self.nChannels = len(inputChannel)
 	def EveryNCallback(self):
 		read = int32()
 		self.ReadAnalogF64(
-			self.samplerate, #number of samples to read
+			self.samplerate, #number of samples to read per channel
 			10.0, #timeout in seconds
 			DAQmx_Val_GroupByScanNumber, #read first sample of every channel then second etc
 			self.data, #array where the samples should be put in
-			self.samplerate, #number of samples 
+			len(self.data), #number of samples we can store
 			byref(read), #reference where to store: numb of samples read
 			None)
 		self.a.extend(self.data.tolist())
-		self.data = self.data.reshape((self.nChannels, self.samplerate/self.nChannels))
-		self.write_end.send(self.data)
+		tosend = self.data.reshape((self.nChannels, len(self.data)/self.nChannels))
+		self.write_end.send(tosend)
 		return 0 # The function should return an integer
 
 class ReadToTwoPipes(ReadCallbackTask):
 	def __init__(self, write_end1, write_end2, inputChannel, samplerate, maxMeasure, minMeasure):
 		ReadCallbackTask.__init__(self, inputChannel, samplerate, maxMeasure, minMeasure)
 		self.nChannels = len(inputChannel)
-		print(self.nChannels)
 		self.write_end1 = write_end1 #transport pipe to other process
 		self.write_end2 = write_end2 #transport pipe to other process
 	def EveryNCallback(self):
 		read = int32()
 		self.ReadAnalogF64(
-			self.samplerate, #number of samples to read
+			self.samplerate, #number of samples to read per channel
 			10.0, #timeout in seconds
 			DAQmx_Val_GroupByScanNumber, #read first sample of every channel then second etc
 			self.data, #array where the samples should be put in
-			self.samplerate, #number of samples 
+			len(self.data), #number of samples we can store
 			byref(read), #reference where to store: numb of samples read
 			None)
 		self.a.extend(self.data.tolist())
-		self.data = self.data.reshape((self.nChannels, self.samplerate/self.nChannels))
-		self.write_end1.send(self.data)
-		self.write_end2.send(self.data)
+		tosend = self.data.reshape((len(self.data)//self.nChannels, self.nChannels))
+		self.write_end1.send(tosend)
+		self.write_end2.send(tosend)
 		return 0 # The function should return an integer
 
 class WriteTask(Task):
@@ -230,12 +227,16 @@ def startGenOnly(output_read_end, stop, rdy, outputChannels,
 	else:
 		print(outputChannels+": closed and reset to 0 volt")
 
-def startReadAndGen(input_write_end, output_read_end, stop, rdy, outputChannel,
+def startReadAndGen(input_write_ends, output_read_end, stop, rdy, outputChannels,
 	                outputShape, inputChannel, samplerate, maxMeasure, minMeasure):
 	sampswritten = int32()
+	if(len(input_write_ends) == 1):
+		readInTask= ReadToOnePipe(input_write_ends[0], inputChannel, samplerate, maxMeasure[0], minMeasure[0])
+	else: #its 2
+		readInTask= ReadToTwoPipes(input_write_ends[0], input_write_ends[1], inputChannel, samplerate, maxMeasure[0], minMeasure[0])
+		
+	writeInTask=WriteTask(outputChannels, outputShape, samplerate, maxMeasure[1], minMeasure[1])
 	
-	readInTask= ReadToPlot(input_write_end, inputChannel, samplerate, maxMeasure, minMeasure)
-	writeInTask=WriteTask(outputChannel, outputShape, samplerate, maxMeasure, minMeasure)
 	if(readInTask.rdy == False or writeInTask.rdy == False):
 		print("errors detected, not starting generation nor readout!!")
 		return 
@@ -277,10 +278,10 @@ def startReadAndGen(input_write_end, output_read_end, stop, rdy, outputChannel,
 	readInTask.ClearTask()
 	writeInTask.ClearTask()
 	
-	if(isinstance(outputChannel, list)):
-		outChannString = ", ".join(outputChannel)
+	if(isinstance(outputChannels, list)):
+		outChannString = ", ".join(outputChannels)
 	else:
-		outChannString = outputChannel
+		outChannString = outputChannels
 	if(isinstance(inputChannel, list)):
 		inputChannString = ", ".join(inputChannel)
 	else:
