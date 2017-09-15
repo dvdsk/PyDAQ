@@ -8,8 +8,6 @@ import numpy as np
 from circBuff import circularNumpyBuffer
 import time
 
-import matplotlib.pyplot as plt
-
 """
 See documentation at: http://zone.ni.com/reference/en-XX/help/370471AA-01/
 
@@ -96,13 +94,9 @@ def trailRun(readTask, writeTask, stop, nPipes, samplerate, transferFunct, nOutp
 	if(nPipes > 1):
 		inputToFile_write_end, inputToFile_read_end = mp.Pipe()
 		input_write_ends.append(inputToFile_write_end)
-	avgReadSamples = 0
 	
 	n = 0
 	while(n<50):
-		t0 = 0
-		t1 = time.time()
-		
 		readTask.ReadAnalogF64(
 			DAQmx_Val_Auto, #read as many samples as there are in the buffer
 			0, #timeout in seconds
@@ -124,7 +118,7 @@ def trailRun(readTask, writeTask, stop, nPipes, samplerate, transferFunct, nOutp
 				sendbuf[start_idx:start_idx+sampsRead.value] = data[0:sampsRead.value]
 				start_idx+=sampsRead.value
 			
-			feedbackSig = transferFunct(buffer, feedbackSig)
+			feedbackSig = transferFunct(buffer, feedbackSig).astype(np.float64, copy=False)
 			writeTask.WriteAnalogF64(
 				1, #number of samples to write per channel
 				True, #start output automatically
@@ -133,8 +127,6 @@ def trailRun(readTask, writeTask, stop, nPipes, samplerate, transferFunct, nOutp
 				feedbackSig, #source array from which to write the data
 				byref(sampsWritten),  #variable to store the numb of written samps in
 				None)
-		t0 = t1
-	print("ReadSamples",ReadSamples)
 	return ReadSamples/50
 
 def calcSampleSize(avgRead, nChannels):
@@ -191,7 +183,7 @@ def feedback(input_write_ends, stop, rdy, transferFunct, inputChannels, outputCh
 					sendbuf[start_idx:start_idx+sampsRead.value] = data[0:sampsRead.value]
 					start_idx+=sampsRead.value
 				
-				feedbackSig = transferFunct(buffer, feedbackSig)
+				feedbackSig = transferFunct(buffer.access(), feedbackSig).astype(np.float64, copy=False)
 				writeTask.WriteAnalogF64(
 					1, #number of samples to write per channel
 					True, #start output automatically
@@ -229,7 +221,8 @@ def feedback(input_write_ends, stop, rdy, transferFunct, inputChannels, outputCh
 					sendbuf[start_idx:start_idx+sampsRead.value] = data[0:sampsRead.value]
 					start_idx+=sampsRead.value
 				
-				feedbackSig = transferFunct(buffer, feedbackSig)
+				feedbackSig = transferFunct(buffer.access(), feedbackSig).astype(np.float64, copy=False)
+    
 				writeTask.WriteAnalogF64(
 					1, #number of samples to write per channel
 					True, #start output automatically

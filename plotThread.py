@@ -1,10 +1,16 @@
-import multiprocessing as mp
-import numpy as np
-import matplotlib
-#matplotlib.use('GTKAgg')
-from matplotlib import pyplot as plt
+#import multiprocessing as mp
 import numpy as np
 from circBuff import circularNumpyBuffer
+#import matplotlib
+#matplotlib.use('GTKAgg')
+
+#this code hides matplotlib deprecation warnings
+import warnings
+import matplotlib.cbook
+warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
+
+#import matplotlib with warnings no suppressed
+from matplotlib import pyplot as plt
 
 def writeToFile(stop, read_end, fileName, format):
 	if(format=="csv"):
@@ -39,7 +45,7 @@ def waitForData(read_end, stop):
 def setupLivePlot(ax, fig):
 	canvas = ax.figure.canvas
 	axbackground = fig.canvas.copy_from_bbox(ax.bbox) # cache the background
-	fig.canvas.draw() #do a first draw before setting data 
+	canvas.draw() #do a first draw before setting data 
 	return axbackground
 
 def updateLivePlot(axbackground, ax, fig, lines):
@@ -73,8 +79,12 @@ def plot(read_end, stop, nChannelsInData, bufferLen):
 	x = np.linspace(0, bufferLen, num=bufferLen)
 	waitForData(read_end, stop)
 	data = read_end.recv()#get the data
-	for i, buffer in enumerate(buffers):
-		buffer.append(data[:,i])  #append it to the buffer
+	if(nChannelsInData == 1):
+		buffers[0].append(data)
+	else:
+		for i, buffer in enumerate(buffers):
+			print(data)
+			buffer.append(data[:,i])  #append it to the buffer
 	
 	#Start the plot
 	fig = plt.figure()
@@ -95,8 +105,11 @@ def plot(read_end, stop, nChannelsInData, bufferLen):
 		#if there is new data, update the x and y data of the plots
 		if(read_end.poll()):
 			data = read_end.recv()#get the data
-			for i, buffer in enumerate(buffers):
-				buffer.append(data[:,i])
+			if(nChannelsInData == 1):
+				buffer.append(data)	
+			else:
+				for i, buffer in enumerate(buffers):
+					buffer.append(data[:,i])
 			
 			#send all the data (that now includes the new
 			#data we recieved above ) to matplotlib. Do

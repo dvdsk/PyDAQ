@@ -3,8 +3,10 @@ This module provides a high level interface to the myDAQ. It can be used to aqui
 """
 import multiprocessing as mp
 import threading
-import numpy as np
 import sys
+from functools import partial
+import signal
+
 
 import simpleRead
 import feedback
@@ -38,7 +40,6 @@ def testIfName():
 		tp.join()
 	if(not cv.is_set()):
 		sys.exit()
-
 
 class PyDAQ:
 	"""class used for access to the mydaq, only one object of this class should be created"""
@@ -162,7 +163,15 @@ class PyDAQ:
 		self.saveDataFormat = format
 		self.saveDataFilename = name
 		
+	def exit_gracefully(self, signal, frame):
+		print('You pressed Ctrl+C!')
+		self.end()
+		sys.exit(0)
+
 	def begin(self):
+		#signal.signal(signal.SIGINT, self.exit_gracefully)		
+		#print("setup signals")
+		
 		if(self.plot):
 			if(self.plotFunct is None):
 				if(self.samplerate > self.plotHistory):
@@ -186,8 +195,21 @@ class PyDAQ:
 			# if(rdy is not None):
 			rdy.wait()
 
+
+	def signal_handler(signal, frame):
+	    raise KeyboardInterrupt('SIGINT received')
+
 	def menu(self):
-		input('Press Enter to stop\n')
+		signal.signal(signal.SIGINT, signal.SIG_DFL)
+		try:
+			input('Press Enter to stop measurement\n')
+		except (KeyboardInterrupt, SystemExit):
+			self.end()
+			sys.exit(0)
+
+		#while(True):
+		#	continue
+		#input('Press Enter to stop\n')
 
 	def end(self):
 		self.stop.set()
