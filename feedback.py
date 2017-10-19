@@ -118,7 +118,7 @@ def trailRun(readTask, writeTask, stop, nPipes, samplerate, transferFunct, nOutp
 				sendbuf[start_idx:start_idx+sampsRead.value] = data[0:sampsRead.value]
 				start_idx+=sampsRead.value
 			
-			feedbackSig = transferFunct(buffer, feedbackSig).astype(np.float64, copy=False)
+			feedbackSig = transferFunct(buffer.access(), feedbackSig).astype(np.float64, copy=False)
 			writeTask.WriteAnalogF64(
 				1, #number of samples to write per channel
 				True, #start output automatically

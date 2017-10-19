@@ -15,8 +15,8 @@ if __name__ == '__main__':
 
 	#configure
 	pd.setFileOptions(name="testData", format="csv")
-	pd.onlyFeedback("myDAQ1/ai0","myDAQ1/ao0",transferFunct,samplerate=100)
-
+	pd.onlyFeedback("myDAQ1/ai0","myDAQ1/ao0", transferFunct,samplerate=100, maxMeasure=6)
+     pd.onlyAquire()
 	
 	pd.begin()
 	pd.menu()

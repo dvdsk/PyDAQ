@@ -114,9 +114,9 @@ class PyDAQ:
 		self.configDone = True
 		return
 
-	def onlyGen(self, outputChannels, outputShape, samplerate=1000, maxMeasure=[10,10], minMeasure=[-10,-10]):
+	def onlyGen(self, outputChannels, outputShape, samplerate=1000, maxGen=[10,10], minGen=[-10,-10]):
 		self.checkConfig()
-		maxMeasure, minMeasure, outputChannels = self.checkIfValidArgs(samplerate, maxMeasure, minMeasure, outputChannels, "gen", False, False)
+		maxMeasure, minMeasure, outputChannels = self.checkIfValidArgs(samplerate, maxGen, minGen, outputChannels, "gen", False, False)
 		self.rdy["gen"] = mp.Event()
 		self.processes["gen"] = mp.Process(target = simpleRead.startGenOnly, 
 			 args = (self.output_read_end, self.stop, self.rdy["gen"], outputChannels, outputShape,
@@ -159,7 +159,34 @@ class PyDAQ:
 		self.plotFunct = plotFunct
 		return
 	
+
 	def setFileOptions(self, name="data", format="csv"):
+		"""
+		sets the name and format for the file the acquired data is written to.
+
+		Parameters
+		----------
+		name : string, optional
+			Name you want the output file to have. Use a filename that is compatible with your OS (No special characters allowed on windows for example). If the file exists new data will be appended at the end. Defaults to "data".
+
+		format : string, optional
+			Format of the data file, future versions of PyDAQ may expand the file types at the moment the only choice and default is "csv".
+
+		Complete Example
+		----------
+		An example setting the name to "test" and the format to "csv"     
+		::
+			pd = pd.PyDAQ()
+
+			configure
+			pd.setFileOptions(name="test", format="csv")
+			pd.onlyAquire(["myDAQ1/ai0", "myDAQ1/ai0"], samplerate=800, 
+			maxMeasure=2, minMeasure=-2, plot=False, saveData=True)
+
+			pd.begin()
+			pd.menu()
+			pd.end()
+		"""
 		self.saveDataFormat = format
 		self.saveDataFilename = name
 		
@@ -183,7 +210,7 @@ class PyDAQ:
 				buflen,))
 			else:
 				self.processes["plotting"] = mp.Process(target = self.plotFunct, 
-				args = (self.inputToPlot_read_end, self.stop, self.nChannelsInData,))
+				args = (self.inputToPlot_read_end, self.stop,))
 		if(self.saveData):
 			self.processes["writeToFile"] = threading.Thread(target=plotThread.writeToFile, 
 			args=(self.stop, self.inputToFile_read_end, self.saveDataFilename, self.saveDataFormat))
