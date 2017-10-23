@@ -32,8 +32,8 @@ import warnings
 class ReadCallbackTask(Task):
 	def __init__(self, inputChannels, samplerate, maxMeasures, minMeasures):
 		Task.__init__(self)
-		# self.data = np.empty(samplerate*len(inputChannels),dtype=np.float64)
-		self.data = np.full(samplerate*len(inputChannels), 0,dtype=np.float64)
+		self.data = np.empty(samplerate*len(inputChannels), dtype=np.float64)
+		#self.data = np.full(samplerate*len(inputChannels), 0, dtype=np.float64)
 		self.a = []
 		self.rdy = True
 		self.samplerate = samplerate
@@ -49,8 +49,10 @@ class ReadCallbackTask(Task):
 					DAQmx_Val_Volts, #units for min val and max val
 					None) #name of custom scale if used
 			except DAQError:
-				print("CRITICAL: INCORRECT inputChannel ("+inputChannel+"), is there a mydaq connected?, "
-					 +"are you specifing an inputChannel?")
+				print("CRITICAL: incorrect inputChannel ("+
+				      inputChannel+")\n\r\t-is there a mydaq connected?, "
+				      +"\n\r\t-are you specifing an inputChannel? "
+				      +"\n\r\t-is that channel not in use?")
 				self.rdy = False
 				return
 		
@@ -60,12 +62,19 @@ class ReadCallbackTask(Task):
 			samplerate, #sample rate (units: samples/second/channel)
 			DAQmx_Val_Rising, #aquire on rising edge of sample clock
 			DAQmx_Val_ContSamps, #aquire continues until task stopped
-			samplerate) #numb to aquire if finitSamps/ bufferSize if contSamps (bufsize in this case)
+			samplerate*len(inputChannels)) #numb to aquire if finitSamps/ bufferSize if contSamps (bufsize in this case)
+			
+			
 		self.AutoRegisterEveryNSamplesEvent(
 			DAQmx_Val_Acquired_Into_Buffer, #the event on which the callback task starts
-			samplerate, #number of samples after which event should occur
+			samplerate, #number of samples after which event should occur, seems to be in numbers per channel (countary to documentation)
 			0) #process callback funct in daqmx thread (alternative DAQmx_Val_SynchronousEventCallbacks)
 		self.AutoRegisterDoneEvent(0)
+		
+		#need to manually set DAQmx buffersize for buffers that are not a 
+		#multiple of 10 to work.
+		bufInputSize = uInt32(2*samplerate*len(inputChannels))
+		self.SetBufInputBufSize(bufInputSize)
 		
 	def DoneCallback(self, status):
 		print("Status"),status.value
@@ -73,7 +82,6 @@ class ReadCallbackTask(Task):
 
 class ReadToOnePipe(ReadCallbackTask):
 	def __init__(self, write_end, inputChannel, samplerate, maxMeasure, minMeasure):
-		print(inputChannel, samplerate, maxMeasure, minMeasure)
 		ReadCallbackTask.__init__(self, inputChannel, samplerate, maxMeasure, minMeasure)
 		self.write_end = write_end #transport pipe to other process
 		self.nChannels = len(inputChannel)
@@ -131,8 +139,10 @@ class WriteTask(Task):
 					DAQmx_Val_Volts, #units for min val and max val
 					None) #name of custom scale if used
 			except DAQError:
-				print("CRITICAL: INCORRECT outputChannel ("+outputChannel+"), is there a mydaq connected?, "
-					 +"are you specifing an outputChannel?")
+				print("CRITICAL: incorrect outputChannel ("+
+				      outputChannel+")\n\r\t-is there a mydaq connected?, "
+				      +"\n\r\t-are you specifing an outputChannel? "
+				      +"\n\r\t-is that channel not in use?")
 				self.rdy = False
 				return
 		
@@ -164,6 +174,8 @@ def startReadOnly(input_write_ends, stop, rdy,
 
 	if(readInTask.rdy == False):
 		print("errors detected, not starting readout!!")
+		stop.set()
+		rdy.set()
 		return 
 
 	readInTask.StartTask()
@@ -185,6 +197,8 @@ def startGenOnly(output_read_end, stop, rdy, outputChannels,
 	writeInTask=WriteTask(outputChannels, outputShape, samplerate, maxMeasure, minMeasure)
 	if(writeInTask.rdy == False):
 		print("errors detected, not starting generation!!")
+		stop.set()
+		rdy.set()
 		return 
 
 	writeInTask.StartTask()
@@ -240,6 +254,8 @@ def startReadAndGen(input_write_ends, output_read_end, stop, rdy, outputChannels
 	
 	if(readInTask.rdy == False or writeInTask.rdy == False):
 		print("errors detected, not starting generation nor readout!!")
+		stop.set()
+		rdy.set()
 		return 
 
 	readInTask.StartTask()
