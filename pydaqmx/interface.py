@@ -8,9 +8,9 @@ from functools import partial
 import signal
 
 
-import simpleRead
-import feedback
-import plotThread
+from pydaqmx import simpleRead
+from pydaqmx import feedback
+from pydaqmx import plotThread
 
 """
 See documentation at: http://zone.ni.com/reference/en-XX/help/370471AA-01/

@@ -1,6 +1,6 @@
 #import multiprocessing as mp
 import numpy as np
-from circBuff import circularNumpyBuffer
+from pydaqmx.circBuff import circularNumpyBuffer
 #import matplotlib
 #matplotlib.use('GTKAgg')
 

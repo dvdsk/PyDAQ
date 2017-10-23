@@ -1,12 +1,14 @@
 import multiprocessing as mp
+import numpy as np
+import time
 
 from PyDAQmx import Task
 from PyDAQmx.DAQmxConstants import *
 from PyDAQmx.DAQmxTypes import *
 from PyDAQmx.DAQmxFunctions import DAQError
-import numpy as np
-from circBuff import circularNumpyBuffer
-import time
+
+from pydaqmx.circBuff import circularNumpyBuffer
+
 
 """
 See documentation at: http://zone.ni.com/reference/en-XX/help/370471AA-01/
