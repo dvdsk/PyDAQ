@@ -139,7 +139,6 @@ class PyDAQ:
 	def onlyFeedback(self, inputChannels, outputChannels, transferFunct, plot=True, saveData=True, samplerate=1000, maxMeasure=10, minMeasure=-10):
 		self.checkConfig()
 		inputChannels, outputChannels, maxMeasure, minMeasure = self.checkIfValidArgs_fb(samplerate, maxMeasure, minMeasure, inputChannels, outputChannels, "onlyFeedback", plot, saveData)
-		print("samplerate: ",samplerate)
 		self.rdy["onlyFeedback"] = mp.Event()
 		self.processes["feedback"] = mp.Process(target = feedback.feedback, 
 			 args = (self.setupInputPipes(plot, saveData), self.stop, self.rdy["onlyFeedback"], transferFunct, inputChannels, outputChannels, samplerate, maxMeasure, minMeasure,))
@@ -222,21 +221,16 @@ class PyDAQ:
 			# if(rdy is not None):
 			rdy.wait()
 
-
 	def signal_handler(signal, frame):
 	    raise KeyboardInterrupt('SIGINT received')
 
 	def menu(self):
 		signal.signal(signal.SIGINT, signal.SIG_DFL)
 		try:
-			input('Press Enter to stop measurement\n')
+			input('Press Enter to stop\n')
 		except (KeyboardInterrupt, SystemExit):
 			self.end()
 			sys.exit(0)
-
-		#while(True):
-		#	continue
-		#input('Press Enter to stop\n')
 
 	def end(self):
 		self.stop.set()

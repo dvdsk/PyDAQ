@@ -29,9 +29,7 @@ class ReadTask(Task):
 		self.rdy = True
 		
 		#configurate input channel, where we read the ouput from the myDAQ
-		print(inputChannels, maxMeasures, minMeasures)
 		for inputChannel, maxMeasure, minMeasure in zip(inputChannels, maxMeasures, minMeasures):
-			print(inputChannel, maxMeasure, minMeasure)
 			try:
 				self.CreateAIVoltageChan(
 					inputChannel, #The name of the physical channel muDAQ1/aiN  (n= 0 or 1)
@@ -145,7 +143,6 @@ def feedback(input_write_ends, stop, rdy, transferFunct, inputChannels, outputCh
 	start_idx = 0
 
 	t0 = time.time()
-	print(inputChannels, outputChannels, samplerate, maxMeasures, minMeasures)
 	readTask = ReadTask(inputChannels, samplerate, maxMeasures[0], minMeasures[0])
 	writeTask = WriteTask(outputChannels, maxMeasures[1], minMeasures[1])
 	if(readTask.rdy == False or writeTask.rdy == False):
@@ -202,7 +199,6 @@ def feedback(input_write_ends, stop, rdy, transferFunct, inputChannels, outputCh
 		data = np.empty(sampleSize*len(inputChannels), dtype=np.float64)
 		while(not stop.wait(0)):
 			t1 = time.time()
-			print(t1-t0)
 			readTask.ReadAnalogF64(
 				sampleSize, #numb of samples to read
 				DAQmx_Val_WaitInfinitely, #no timeout

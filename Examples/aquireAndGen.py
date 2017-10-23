@@ -1,8 +1,9 @@
-if __name__ == '__main__':
-	import pyMyDAQ as pd
-	import numpy as np
+import pydaqmx
+import numpy as np
 
-	pd = pd.PyDAQ()
+if __name__ == '__main__':
+
+	pd = pydaqmx.PyDAQ()
 
 	#configure
 	pd.setFileOptions(name="testData", format="csv")
@@ -11,10 +12,3 @@ if __name__ == '__main__':
 	pd.begin()
 	pd.menu()
 	pd.end()
-	
-	while(pd.Running){
-		
-	
-	
-	
-	}

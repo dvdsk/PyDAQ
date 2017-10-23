@@ -18,8 +18,6 @@ def writeToFile(stop, read_end, fileName, format):
 			while(not stop.is_set()):
 				if(read_end.poll(0.1)):
 					data = read_end.recv()
-					# print("DATA:")
-					# print(data)
 					np.savetxt(f_handle, data, fmt='%5.3f') #print every number as 5 characters with 3 decimals (millivolts range is abs accuracy of mydaq
 				else:
 					continue
@@ -83,7 +81,6 @@ def plot(read_end, stop, nChannelsInData, bufferLen):
 		buffers[0].append(data)
 	else:
 		for i, buffer in enumerate(buffers):
-			print(data)
 			buffer.append(data[:,i])  #append it to the buffer
 	
 	#Start the plot
