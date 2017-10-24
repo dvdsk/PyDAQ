@@ -7,7 +7,7 @@ from PyDAQmx.DAQmxConstants import *
 from PyDAQmx.DAQmxTypes import *
 from PyDAQmx.DAQmxFunctions import DAQError
 
-from pydaqmx.circBuff import circularNumpyBuffer
+from pydaq.circBuff import circularNumpyBuffer
 
 
 """

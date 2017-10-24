@@ -1,4 +1,4 @@
-import pydaqmx
+import pydaq
 import numpy as np
 
 def transferFunct(buffer,lastFeedback):
@@ -7,7 +7,7 @@ def transferFunct(buffer,lastFeedback):
 	return np.array([3])
 
 if __name__ == '__main__':
-	pd = pydaqmx.PyDAQ()
+	pd = pydaq.PyDAQ()
 
 	#configure
 	pd.setFileOptions(name="testData", format="csv")

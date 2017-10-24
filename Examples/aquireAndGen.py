@@ -1,9 +1,9 @@
-import pydaqmx
+import pydaq
 import numpy as np
 
 if __name__ == '__main__':
 
-	pd = pydaqmx.PyDAQ()
+	pd = pydaq.PyDAQ()
 
 	#configure
 	pd.setFileOptions(name="testData", format="csv")

@@ -1,6 +1,6 @@
 #import multiprocessing as mp
 import numpy as np
-from pydaqmx.circBuff import circularNumpyBuffer
+from pydaq.circBuff import circularNumpyBuffer
 #import matplotlib
 #matplotlib.use('GTKAgg')
 
@@ -94,8 +94,7 @@ def plot(read_end, stop, nChannelsInData, bufferLen):
 	#another possibility would be plt.scatter
 	lines = []
 	for i, buffer in enumerate(buffers):
-		line, = ax.plot(buffer.access(), x[:len(buffer)])
-		lines.append(line)
+		lines += ax.plot(buffer.access(), x[:len(buffer)])
 	
 	#keep updating the plot until the program stops
 	while(not stop.is_set()):

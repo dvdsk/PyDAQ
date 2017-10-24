@@ -1,4 +1,4 @@
-import pydaqmx
+import pydaq
 import numpy as np
 
 def transferFunct(buffer, feedbackSig):
@@ -14,7 +14,7 @@ def transferFunct(buffer, feedbackSig):
 	return feedbackSig
 
 if __name__ == '__main__':
-	pd = pydaqmx.PyDAQ()
+	pd = pydaq.PyDAQ()
 
 	#configure
 	pd.setFileOptions(name="testData", format="csv")
