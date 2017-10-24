@@ -128,6 +128,9 @@ class WriteTask(Task):
 		self.sampswritten = int32()
 		self.a = []
 		self.rdy = True
+		
+		outputData = outputData.astype(np.float64)
+		
 		for outputChannel, maxMeasure, minMeasure in zip(outputChannels, maxMeasure, minMeasure):
 			try:
 				#configurate output channel, this is the signal the myDAQ outputs
@@ -146,7 +149,6 @@ class WriteTask(Task):
 				self.rdy = False
 				return
 		
-		outputData = outputData.astype(np.float64)
 		#configurate timing and sample rate for the samples
 		self.CfgSampClkTiming(
 			"", #source terimal of Sample clock ("" means onboard clock)
@@ -155,10 +157,10 @@ class WriteTask(Task):
 			DAQmx_Val_ContSamps, #generate continues until task stopped
 			len(outputData)) #numb to generate if finitSamps/ bufferSize if contSamps (bufsize in this case)
 		self.WriteAnalogF64(
-			len(outputData)//len(outputChannels), #number of samples to write
+			len(outputData)//len(outputChannels), #number of samples to write per channel
 			False, #start output automatically
 			DAQmx_Val_WaitInfinitely, #timeout to wait for funct to write samples 
-			DAQmx_Val_GroupByChannel, #read entire channel in one go
+			DAQmx_Val_GroupByChannel , #data orderd with channel 1 first then 2 data etc
 			outputData, #source array from which to write the data
 			byref(self.sampswritten), #variable to store the numb of written samps in
 			None)
