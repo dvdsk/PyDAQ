@@ -164,7 +164,18 @@ class WriteTask(Task):
 			outputData, #source array from which to write the data
 			byref(self.sampswritten), #variable to store the numb of written samps in
 			None)
-
+		
+		#not supported by some hardware
+		try:
+			self.CfgDigEdgeStartTrig("ai/StartTrigger", DAQmx_Val_Rising)
+		except DAQError:
+			print("IMPORTANT: unsynced input and output start"
+				  +"\n\r\t-this device does not support hardware triggering, "
+				  +"\n\r\t this means the output will be started by this program"
+				  +"\n\r\t after the input, there will be some delay in between."
+				  +"\n\r"
+				  +"\n\r\t-Capturing part of the output signal as input"
+				  +"\n\r\t can be helpfull in synchronising output and input in post")
 def startReadOnly(input_write_ends, stop, rdy,
 	              inputChannel, samplerate, maxMeasure, minMeasure):
 	sampswritten = int32()
