@@ -1,4 +1,5 @@
 #import multiprocessing as mp
+import os
 import numpy as np
 from pydaq.circBuff import circularNumpyBuffer
 #import matplotlib
@@ -12,13 +13,18 @@ warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 #import matplotlib with warnings no suppressed
 from matplotlib import pyplot as plt
 
-def writeToFile(stop, read_end, fileName, format):
+def writeToFile(stop, read_end, fileName, format, overwrite, delimiter_):
 	if(format=="csv"):
-		with open(fileName+'.csv','a+b') as f_handle:
+		if overwrite:
+			mode = 'w+b'
+		else:
+			mode = 'a+b'
+		with open(fileName+'.csv', mode) as f_handle:
 			while(not stop.is_set()):
 				if(read_end.poll(0.1)):
 					data = read_end.recv()
-					np.savetxt(f_handle, data, fmt='%5.3f') #print every number as 5 characters with 3 decimals (millivolts range is abs accuracy of mydaq
+					#print every number as 5 characters with 3 decimals (millivolts range is abs accuracy of mydaq
+					np.savetxt(f_handle, data, delimiter=delimiter_, newline=os.linesep,fmt='%5.3f') 
 				else:
 					continue
 	elif(format=="npy"): #TODO

@@ -30,13 +30,14 @@ import ctypes.util
 import warnings
 
 class ReadCallbackTask(Task):
-	def __init__(self, inputChannels, samplerate, maxMeasures, minMeasures):
+	def __init__(self, inputChannels, samplerate, maxMeasures, minMeasures, nToMeasure):
 		Task.__init__(self)
 		self.data = np.empty(samplerate*len(inputChannels), dtype=np.float64)
 		#self.data = np.full(samplerate*len(inputChannels), 0, dtype=np.float64)
 		self.a = []
 		self.rdy = True
 		self.samplerate = samplerate
+		
 		for inputChannel, maxMeasure, minMeasure in zip(inputChannels, maxMeasures, minMeasures):
 			try:
 				#configurate input channel, where we read the ouput from the myDAQ
@@ -56,35 +57,46 @@ class ReadCallbackTask(Task):
 				self.rdy = False
 				return
 		
-		#configurate timing and sample rate for the samples
-		self.CfgSampClkTiming(
-			"", #source terimal of Sample clock ("" means onboard clock)
-			samplerate, #sample rate (units: samples/second/channel)
-			DAQmx_Val_Rising, #aquire on rising edge of sample clock
-			DAQmx_Val_ContSamps, #aquire continues until task stopped
-			samplerate*len(inputChannels)) #numb to aquire if finitSamps/ bufferSize if contSamps (bufsize in this case)
-			
-			
-		self.AutoRegisterEveryNSamplesEvent(
-			DAQmx_Val_Acquired_Into_Buffer, #the event on which the callback task starts
-			samplerate, #number of samples after which event should occur, seems to be in numbers per channel (countary to documentation)
-			0) #process callback funct in daqmx thread (alternative DAQmx_Val_SynchronousEventCallbacks)
-		self.AutoRegisterDoneEvent(0)
 		
-		#need to manually set DAQmx buffersize for buffers that are not a 
-		#multiple of 10 to work.
-		bufInputSize = uInt32(2*samplerate*len(inputChannels))
-		self.SetBufInputBufSize(bufInputSize)
+		if(nToMeasure > 0):
+			#configurate timing and sample rate for the samples
+			self.CfgSampClkTiming(
+				"", #source terimal of Sample clock ("" means onboard clock)
+				samplerate, #sample rate (units: samples/second/channel)
+				DAQmx_Val_Rising, #aquire on rising edge of sample clock
+				DAQmx_Val_FiniteSamps,
+				samplerate//len(inputChannels)) #numb to aquire if finitSamps/ bufferSize if contSamps (bufsize in this case)
+			
+		else:
+			#configurate timing and sample rate for the samples
+			self.CfgSampClkTiming(
+				"", #source terimal of Sample clock ("" means onboard clock)
+				samplerate, #sample rate (units: samples/second/channel)
+				DAQmx_Val_Rising, #aquire on rising edge of sample clock
+				DAQmx_Val_ContSamps,
+				samplerate//len(inputChannels)) #numb to aquire if finitSamps/ bufferSize if contSamps (bufsize in this case)
+			
+			self.AutoRegisterEveryNSamplesEvent(
+				DAQmx_Val_Acquired_Into_Buffer, #the event on which the callback task starts
+				samplerate, #number of samples after which event should occur, seems to be in numbers per channel (countary to documentation)
+				0) #process callback funct in daqmx thread (alternative DAQmx_Val_SynchronousEventCallbacks)
+			self.AutoRegisterDoneEvent(0)
+			
+			#need to manually set DAQmx buffersize for buffers that are not a 
+			#multiple of 10 to work.
+			bufInputSize = uInt32(2*samplerate*len(inputChannels))
+			self.SetBufInputBufSize(bufInputSize)
 		
 	def DoneCallback(self, status):
 		print("Status"),status.value
 		return 0 # The function should return an integer
 
 class ReadToOnePipe(ReadCallbackTask):
-	def __init__(self, write_end, inputChannel, samplerate, maxMeasure, minMeasure):
-		ReadCallbackTask.__init__(self, inputChannel, samplerate, maxMeasure, minMeasure)
+	def __init__(self, write_end, inputChannel, samplerate, maxMeasure, minMeasure, nToMeasure):
+		ReadCallbackTask.__init__(self, inputChannel, samplerate, maxMeasure, minMeasure, nToMeasure)
 		self.write_end = write_end #transport pipe to other process
 		self.nChannels = len(inputChannel)
+		
 	def EveryNCallback(self):
 		read = int32()
 		self.ReadAnalogF64(
@@ -101,8 +113,8 @@ class ReadToOnePipe(ReadCallbackTask):
 		return 0 # The function should return an integer
 
 class ReadToTwoPipes(ReadCallbackTask):
-	def __init__(self, write_end1, write_end2, inputChannel, samplerate, maxMeasure, minMeasure):
-		ReadCallbackTask.__init__(self, inputChannel, samplerate, maxMeasure, minMeasure)
+	def __init__(self, write_end1, write_end2, inputChannel, samplerate, maxMeasure, minMeasure, nToMeasure):
+		ReadCallbackTask.__init__(self, inputChannel, samplerate, maxMeasure, minMeasure, nToMeasure)
 		self.nChannels = len(inputChannel)
 		self.write_end1 = write_end1 #transport pipe to other process
 		self.write_end2 = write_end2 #transport pipe to other process
@@ -249,12 +261,12 @@ def startGenOnly(output_read_end, stop, rdy, outputChannels,
 		print(outputChannels+": closed and reset to 0 volt")
 
 def startReadAndGen(input_write_ends, output_read_end, stop, rdy, outputChannels,
-	                outputShape, inputChannel, samplerate, maxMeasure, minMeasure, finiteMeasure, finiteGen):
+	                outputShape, inputChannel, samplerate, maxMeasure, minMeasure, nToMeasure, finiteGen):
 	sampswritten = int32()
 	if(len(input_write_ends) == 1):
-		readInTask= ReadToOnePipe(input_write_ends[0], inputChannel, samplerate, maxMeasure[0], minMeasure[0])
+		readInTask= ReadToOnePipe(input_write_ends[0], inputChannel, samplerate, maxMeasure[0], minMeasure[0], nToMeasure)
 	else: #its 2
-		readInTask= ReadToTwoPipes(input_write_ends[0], input_write_ends[1], inputChannel, samplerate, maxMeasure[0], minMeasure[0])
+		readInTask= ReadToTwoPipes(input_write_ends[0], input_write_ends[1], inputChannel, samplerate, maxMeasure[0], minMeasure[0], nToMeasure)
 		
 	writeInTask=WriteTask(outputChannels, outputShape, samplerate, maxMeasure[1], minMeasure[1], finiteGen)
 	

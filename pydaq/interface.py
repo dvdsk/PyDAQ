@@ -53,9 +53,10 @@ class PyDAQ:
 		self.samplerate = 0
 		self.nChannelsInData = 1
 		self.saveData = False
-		self.saveDataFormat = "csv"
-		self.saveDataFilename = "data"
-		
+		self.saveDataFormat = ""
+		self.saveDataFilename = ""
+		self.saveDataDelimiter = ""
+		self.saveDataOverwrite = ""
 		
 		self.configDone = False
 		
@@ -126,13 +127,13 @@ class PyDAQ:
  
 	#TODO expand for multi channels
 	def aquireAndGen(self, inputChannels, outputChannels, outputShape, plot=True, saveData=True,
-	samplerate=1000, maxMeasure=10, minMeasure=-10):
+	samplerate=1000, maxMeasure=10, minMeasure=-10, finiteGen=False, nToMeasure=0):
 		self.checkConfig()
 		inputChannels, outputChannels, maxMeasure, minMeasure = self.checkIfValidArgs_fb(samplerate, maxMeasure, minMeasure, inputChannels, outputChannels, "onlyFeedback", plot, saveData)
 		
 		self.rdy["aquireAndGen"] = mp.Event()
 		self.processes["aquireAndGen"] = mp.Process(target = simpleRead.startReadAndGen, 
-			 args = (self.setupInputPipes(plot, saveData), self.output_read_end, self.stop, self.rdy["aquireAndGen"], outputChannels, outputShape,inputChannels, samplerate, maxMeasure, minMeasure))  
+			 args = (self.setupInputPipes(plot, saveData), self.output_read_end, self.stop, self.rdy["aquireAndGen"], outputChannels, outputShape,inputChannels, samplerate, maxMeasure, minMeasure, nToMeasure, finiteGen))  
 		self.configDone = True
 		return
 
@@ -159,7 +160,7 @@ class PyDAQ:
 		return
 	
 
-	def setFileOptions(self, name="data", format="csv"):
+	def setFileOptions(self, name="data", format="csv", overwrite=False, delimiter=", "):
 		"""
 		sets the name and format for the file the acquired data is written to.
 
@@ -188,7 +189,8 @@ class PyDAQ:
 		"""
 		self.saveDataFormat = format
 		self.saveDataFilename = name
-		
+		self.saveDataDelimiter = delimiter
+		self.saveDataOverwrite = overwrite
 	def exit_gracefully(self, signal, frame):
 		print('You pressed Ctrl+C!')
 		self.end()
@@ -212,7 +214,7 @@ class PyDAQ:
 				args = (self.inputToPlot_read_end, self.stop,))
 		if(self.saveData):
 			self.processes["writeToFile"] = threading.Thread(target=plotThread.writeToFile, 
-			args=(self.stop, self.inputToFile_read_end, self.saveDataFilename, self.saveDataFormat))
+			args=(self.stop, self.inputToFile_read_end, self.saveDataFilename, self.saveDataFormat, self.saveDataOverwrite, self.saveDataDelimiter))
 		for process in self.processes.values():
 			# if(process is not None):
 			process.start()
