@@ -123,13 +123,14 @@ class ReadToTwoPipes(ReadCallbackTask):
 		return 0 # The function should return an integer
 
 class WriteTask(Task):
-	def __init__(self, outputChannels, outputData, samplerate, maxMeasure, minMeasure):
+	def __init__(self, outputChannels, outputData, samplerate, maxMeasure, minMeasure, finite):
 		Task.__init__(self)
 		self.sampswritten = int32()
 		self.a = []
 		self.rdy = True
 		
 		outputData = outputData.astype(np.float64)
+		sampleMode = DAQmx_Val_ContSamps
 		
 		for outputChannel, maxMeasure, minMeasure in zip(outputChannels, maxMeasure, minMeasure):
 			try:
@@ -150,12 +151,15 @@ class WriteTask(Task):
 				return
 		
 		#configurate timing and sample rate for the samples
+		if(finite):
+			sampleMode = DAQmx_Val_FiniteSamps
+			
 		self.CfgSampClkTiming(
 			"", #source terimal of Sample clock ("" means onboard clock)
 			samplerate, #sample rate (units: samples/second/channel)
 			DAQmx_Val_Rising, #generage on rising edge of sample clock
-			DAQmx_Val_ContSamps, #generate continues until task stopped
-			len(outputData)) #numb to generate if finitSamps/ bufferSize if contSamps (bufsize in this case)
+			sampleMode, #generate continues until task stopped
+			len(outputData)//len(outputChannels)) #numb to generate if finitSamps/ bufferSize if contSamps (bufsize in this case)
 		self.WriteAnalogF64(
 			len(outputData)//len(outputChannels), #number of samples to write per channel
 			False, #start output automatically
@@ -245,14 +249,14 @@ def startGenOnly(output_read_end, stop, rdy, outputChannels,
 		print(outputChannels+": closed and reset to 0 volt")
 
 def startReadAndGen(input_write_ends, output_read_end, stop, rdy, outputChannels,
-	                outputShape, inputChannel, samplerate, maxMeasure, minMeasure):
+	                outputShape, inputChannel, samplerate, maxMeasure, minMeasure, finiteMeasure, finiteGen):
 	sampswritten = int32()
 	if(len(input_write_ends) == 1):
 		readInTask= ReadToOnePipe(input_write_ends[0], inputChannel, samplerate, maxMeasure[0], minMeasure[0])
 	else: #its 2
 		readInTask= ReadToTwoPipes(input_write_ends[0], input_write_ends[1], inputChannel, samplerate, maxMeasure[0], minMeasure[0])
 		
-	writeInTask=WriteTask(outputChannels, outputShape, samplerate, maxMeasure[1], minMeasure[1])
+	writeInTask=WriteTask(outputChannels, outputShape, samplerate, maxMeasure[1], minMeasure[1], finiteGen)
 	
 	if(readInTask.rdy == False or writeInTask.rdy == False):
 		print("errors detected, not starting generation nor readout!!")
