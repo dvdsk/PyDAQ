@@ -27,7 +27,7 @@ class ReadTask(Task):
 		self.data = np.empty(200)
 		self.a = []
 		self.rdy = True
-		
+
 		#configurate input channel, where we read the ouput from the myDAQ
 		for inputChannel, maxMeasure, minMeasure in zip(inputChannels, maxMeasures, minMeasures):
 			try:
@@ -40,11 +40,12 @@ class ReadTask(Task):
 					DAQmx_Val_Volts, #units for min val and max val
 					None) #name of custom scale if used
 			except DAQError:
-				print("CRITICAL: INCORRECT inputChannel ("+inputChannel+"), is there a mydaq connected?, "
-					 +"are you specifing an inputChannel?")
+				print((
+				    f"CRITICAL: INCORRECT inputChannel ({inputChannel}), is there a mydaq connected?, "
+				    + "are you specifing an inputChannel?"))
 				self.rdy = False
 				return
-			
+
 		#configurate timing and sample rate for the samples
 		self.CfgSampClkTiming(
 			"", #source terimal of Sample clock ("" means onboard clock)
@@ -59,7 +60,7 @@ class WriteTask(Task):
 		self.sampswritten = int32()
 		self.a = []
 		self.rdy = True
-		
+
 		#configurate output channel, this is the signal the myDAQ outputs
 		for outputChannel, maxMeasure, minMeasure in zip(outputChannels, maxMeasures, minMeasures):
 			try:
@@ -71,8 +72,9 @@ class WriteTask(Task):
 					DAQmx_Val_Volts, #units for min val and max val
 					None) #name of custom scale if used
 			except DAQError:
-				print("CRITICAL: INCORRECT outputChannel ("+outputChannel+"), is there a mydaq connected?, "
-					 +"are you specifing an outputChannel?")
+				print((
+				    f"CRITICAL: INCORRECT outputChannel ({outputChannel}), is there a mydaq connected?, "
+				    + "are you specifing an outputChannel?"))
 				self.rdy = False
 				return
 #not configuring sample timing -> driver in on demand sample for anolog out
@@ -94,9 +96,9 @@ def trailRun(readTask, writeTask, stop, nPipes, samplerate, transferFunct, nOutp
 	if(nPipes > 1):
 		inputToFile_write_end, inputToFile_read_end = mp.Pipe()
 		input_write_ends.append(inputToFile_write_end)
-	
+
 	n = 0
-	while(n<50):
+	while (n<50):
 		readTask.ReadAnalogF64(
 			DAQmx_Val_Auto, #read as many samples as there are in the buffer
 			0, #timeout in seconds
@@ -105,19 +107,19 @@ def trailRun(readTask, writeTask, stop, nPipes, samplerate, transferFunct, nOutp
 			200, #number of samples
 			byref(sampsRead), #reference where to store: numb of samples read
 			None)
-		if(sampsRead.value != 0): 
+		if (sampsRead.value != 0): 
 			n+=1
 			ReadSamples += sampsRead.value
-			buffer.append(data[0:sampsRead.value])
-			if(start_idx > 200-1):
-				tosend = sendbuf[0:start_idx]
+			buffer.append(data[:sampsRead.value])
+			if (start_idx > 200-1):
+				tosend = sendbuf[:start_idx]
 				for write_end in input_write_ends:
 					write_end.send(tosend)
 				start_idx = 0
 			else:
-				sendbuf[start_idx:start_idx+sampsRead.value] = data[0:sampsRead.value]
+				sendbuf[start_idx:start_idx+sampsRead.value] = data[:sampsRead.value]
 				start_idx+=sampsRead.value
-			
+
 			feedbackSig = transferFunct(buffer.access(), feedbackSig).astype(np.float64, copy=False)
 			writeTask.WriteAnalogF64(
 				1, #number of samples to write per channel
@@ -138,7 +140,7 @@ def feedback(input_write_ends, stop, rdy, transferFunct, inputChannels, outputCh
 	buffer = circularNumpyBuffer(10000, dtype=np.float64) #TODO expose to user (len)
 	sampsWritten = int32()
 	sampsRead = int32()
-	
+
 	sendbuf = np.empty(200*2)
 	start_idx = 0
 
@@ -148,21 +150,21 @@ def feedback(input_write_ends, stop, rdy, transferFunct, inputChannels, outputCh
 	if(readTask.rdy == False or writeTask.rdy == False):
 		print("errors detected, not starting readout!!")
 		return 
-	
+
 	feedbackSig = np.full(len(outputChannels), 0, dtype=np.float64)
 	start_idx= 0
 	rdy.set()
-	
+
 	times = 0
-	n = 0
-	if(len(inputChannels) == 1):
+	if (len(inputChannels) == 1):
 		data = np.empty(samplerate, dtype=np.float64)
-		while(not stop.wait(0)):
+		n = 0
+		while (not stop.wait(0)):
 			t0 = 0
 			t1 = time.time()
 			times += t1-t0
 			n+=1
-			
+
 			readTask.ReadAnalogF64(
 				DAQmx_Val_Auto, #read as many samples as there are in the buffer
 				0, #timeout in seconds
@@ -171,17 +173,17 @@ def feedback(input_write_ends, stop, rdy, transferFunct, inputChannels, outputCh
 				200, #number of samples
 				byref(sampsRead), #reference where to store: numb of samples read
 				None)
-			if(sampsRead.value != 0): 
-				buffer.append(data[0:sampsRead.value])
-				if(start_idx > 200-1):
-					tosend = sendbuf[0:start_idx]
+			if (sampsRead.value != 0): 
+				buffer.append(data[:sampsRead.value])
+				if (start_idx > 200-1):
+					tosend = sendbuf[:start_idx]
 					for write_end in input_write_ends:
 						write_end.send(tosend)
 					start_idx = 0
 				else:
-					sendbuf[start_idx:start_idx+sampsRead.value] = data[0:sampsRead.value]
+					sendbuf[start_idx:start_idx+sampsRead.value] = data[:sampsRead.value]
 					start_idx+=sampsRead.value
-				
+
 				feedbackSig = transferFunct(buffer.access(), feedbackSig).astype(np.float64, copy=False)
 				writeTask.WriteAnalogF64(
 					1, #number of samples to write per channel
@@ -197,7 +199,7 @@ def feedback(input_write_ends, stop, rdy, transferFunct, inputChannels, outputCh
 		avgNSamples = trailRun(readTask, writeTask, stop, len(input_write_ends), samplerate, transferFunct, len(outputChannels))
 		sampleSize = calcSampleSize(avgNSamples, len(inputChannels))
 		data = np.empty(sampleSize*len(inputChannels), dtype=np.float64)
-		while(not stop.wait(0)):
+		while (not stop.wait(0)):
 			t1 = time.time()
 			readTask.ReadAnalogF64(
 				sampleSize, #numb of samples to read
@@ -207,20 +209,20 @@ def feedback(input_write_ends, stop, rdy, transferFunct, inputChannels, outputCh
 				sampleSize*len(inputChannels), #number of samples
 				byref(sampsRead), #reference where to store: numb of samples read
 				None)
-			if(sampsRead.value != 0): 
-				buffer.append(data[0:sampsRead.value])
-				if(start_idx > 200-1):
-					tosend = sendbuf[0:start_idx]
+			if (sampsRead.value != 0): 
+				buffer.append(data[:sampsRead.value])
+				if (start_idx > 200-1):
+					tosend = sendbuf[:start_idx]
 					tosend = tosend.reshape(len(tosend)//len(inputChannels), len(inputChannels))
 					for write_end in input_write_ends:
 						write_end.send(tosend)
 					start_idx = 0
 				else:
-					sendbuf[start_idx:start_idx+sampsRead.value] = data[0:sampsRead.value]
+					sendbuf[start_idx:start_idx+sampsRead.value] = data[:sampsRead.value]
 					start_idx+=sampsRead.value
-				
+
 				feedbackSig = transferFunct(buffer.access(), feedbackSig).astype(np.float64, copy=False)
-    
+
 				writeTask.WriteAnalogF64(
 					1, #number of samples to write per channel
 					True, #start output automatically
@@ -230,7 +232,7 @@ def feedback(input_write_ends, stop, rdy, transferFunct, inputChannels, outputCh
 					byref(sampsWritten),  #variable to store the numb of written samps in
 					None)
 			t0 = t1
-	
+
 	#shutdown routine
 	#start by setting the output signal to zero
 	writeTask.StopTask()
@@ -242,7 +244,7 @@ def feedback(input_write_ends, stop, rdy, transferFunct, inputChannels, outputCh
 		np.full(len(outputChannels), 0, dtype=np.float64), #source array from which to write the data
 		byref(sampsWritten),  #variable to store the numb of written samps in
 		None)
-	
+
 	readTask.StopTask()
 	writeTask.StopTask()
 	readTask.ClearTask()

@@ -5,11 +5,7 @@ def transferFunct(buffer, feedbackSig):
 	lenEven = len(buffer)//2*2
 	V = buffer.access()[lenEven-2]
 	R = V/((5-V)/1000)
-	if(R > 822.5):
-		feedbackSig[0] += 0.1
-	else:
-		feedbackSig[0] += 0.1
-	
+	feedbackSig[0] += 0.1
 	feedbackSig = np.clip(feedbackSig, -10, 10)
 	return feedbackSig
 

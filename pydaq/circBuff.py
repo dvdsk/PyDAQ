@@ -18,14 +18,13 @@ class circularNumpyBuffer:
 		self.capacity = capacity
 	def append(self,sample):
 		#check if we have enough space left in the array
-		if(self.right_index+len(sample)<self.arrLen):
+		if (self.right_index+len(sample)<self.arrLen):
 			#copy the new data into the array
 			usedCapacity = self.right_index-self.left_index
 			self.arr[self.right_index : self.right_index+len(sample)] = sample
 			#check if we are at capacity and need to 'forget' some data by shifting the left index
 			if(usedCapacity + len(sample) > self.capacity):
 				self.left_index += len(sample)
-			self.right_index += len(sample)
 		else:
 			#start by forgetting the data we no longer need
 			newLeft = self.left_index+np.size(sample)
@@ -38,7 +37,8 @@ class circularNumpyBuffer:
 			#left index does not need updating as we started by updating left/forgetting some data
 			#and took this into account when moving data back to the the start of the array
 			self.arr[self.right_index : self.right_index+len(sample)] = sample
-			self.right_index += len(sample)
+
+		self.right_index += len(sample)
 	def access(self):
 		#print(self.left_index)
 		#print(self.right_index)
