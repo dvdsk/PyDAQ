@@ -195,15 +195,10 @@ class PyDAQ:
 		sys.exit(0)
 
 	def begin(self):
-		#signal.signal(signal.SIGINT, self.exit_gracefully)		
-		#print("setup signals")
-		
-		if(self.plot):
-			if(self.plotFunct is None):
-				if(self.samplerate > self.plotHistory):
-					buflen = self.samplerate
-				else:
-					buflen = self.plotHistory
+		if self.plot:
+			if (self.plotFunct is None):
+				buflen = (self.samplerate if
+				          (self.samplerate > self.plotHistory) else self.plotHistory)
 				self.processes["plotting"] = mp.Process(target = plotThread.plot, 
 				args = (self.inputToPlot_read_end, self.stop, self.nChannelsInData,
 				buflen,))
@@ -221,8 +216,8 @@ class PyDAQ:
 			# if(rdy is not None):
 			rdy.wait()
 
-	def signal_handler(signal, frame):
-	    raise KeyboardInterrupt('SIGINT received')
+	def signal_handler(self, frame):
+		raise KeyboardInterrupt('SIGINT received')
 
 	def menu(self):
 		signal.signal(signal.SIGINT, signal.SIG_DFL)
@@ -236,18 +231,16 @@ class PyDAQ:
 		self.stop.set()
 		for processName, process in self.processes.items():
 			process.join()
-			print("{0:15} {1}".format(processName+":", "stopped"))
+			print("{0:15} {1}".format(f"{processName}:", "stopped"))
 
 	def checkIfValidArgs_fb(self, samplerate, maxMeasure, minMeasure, inputChannels, outputChannels, methodName, plot, saveData):
 		
 		def convertAndExpandArgs(arg, nIn, nOut):
 			toReturn = []
-			if(not isinstance(arg, list)): #x, x
-				toReturn.append([arg] * nIn)
-				toReturn.append([arg] * nOut)
-			elif(not isinstance(arg[0], list)): #[x,x]
-				toReturn.append(arg[0] * nIn)
-				toReturn.append(arg[1] * nOut)
+			if (not isinstance(arg, list)): #x, x
+				toReturn.extend(([arg] * nIn, [arg] * nOut))
+			elif not isinstance(arg[0], list): #[x,x]
+				toReturn.extend((arg[0] * nIn, arg[1] * nOut))
 			return toReturn
 		
 		if(not isinstance(inputChannels, list)):

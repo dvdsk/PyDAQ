@@ -13,24 +13,21 @@ warnings.filterwarnings("ignore",category=matplotlib.cbook.mplDeprecation)
 from matplotlib import pyplot as plt
 
 def writeToFile(stop, read_end, fileName, format):
-	if(format=="csv"):
-		with open(fileName+'.csv','a+b') as f_handle:
-			while(not stop.is_set()):
-				if(read_end.poll(0.1)):
-					data = read_end.recv()
-					np.savetxt(f_handle, data, fmt='%5.3f') #print every number as 5 characters with 3 decimals (millivolts range is abs accuracy of mydaq
-				else:
+	if format=="npz":
+		return
+	if (format=="csv"):
+		with open(f'{fileName}.csv', 'a+b') as f_handle:
+			while (not stop.is_set()):
+				if not (read_end.poll(0.1)):
 					continue
-	elif(format=="npy"): #TODO
-		with open(fileName+'.bin','a+b') as f_handle:
-			while(not stop.is_set()):
-				if(read_end.poll(0.1)):
+				data = read_end.recv()
+				np.savetxt(f_handle, data, fmt='%5.3f') #print every number as 5 characters with 3 decimals (millivolts range is abs accuracy of mydaq
+	elif format=="npy": #TODO
+		with open(f'{fileName}.bin', 'a+b') as f_handle:
+			while (not stop.is_set()):
+				if (read_end.poll(0.1)):
 					data = read_end.recv()
 					np.save(f_handle, data)
-				else:
-					continue
-	elif(format=="npz"):
-		pass #TODO
 
 # def readFromFile(fileName, format):
 #TODO
@@ -69,10 +66,9 @@ def updateLivePlot(axbackground, ax, fig, lines):
 def plot(read_end, stop, nChannelsInData, bufferLen):
 	#this buffer is used to keep the last 'bufferLen' points
 	#that have been send from the mydaq for plotting
-	buffers = []
-	for n in range(nChannelsInData):
-		buffers.append(circularNumpyBuffer(bufferLen, np.float64))
-	
+	buffers = [
+	    circularNumpyBuffer(bufferLen, np.float64) for _ in range(nChannelsInData)
+	]
 	#the x axis is just the number of points for now
 	x = np.linspace(0, bufferLen, num=bufferLen)
 	waitForData(read_end, stop)
@@ -82,20 +78,20 @@ def plot(read_end, stop, nChannelsInData, bufferLen):
 	else:
 		for i, buffer in enumerate(buffers):
 			buffer.append(data[:,i])  #append it to the buffer
-	
+
 	#Start the plot
 	fig = plt.figure()
 	ax = fig.add_subplot(1, 1, 1)
-	
+
 	#set things up for live plotting
 	cachedPlotData = setupLivePlot(ax, fig)
 
 	#add a new plot line (works just like plt.plot)
 	#another possibility would be plt.scatter
 	lines = []
-	for i, buffer in enumerate(buffers):
+	for buffer in buffers:
 		lines += ax.plot(buffer.access(), x[:len(buffer)])
-	
+
 	#keep updating the plot until the program stops
 	while(not stop.is_set()):
 		#if there is new data, update the x and y data of the plots
@@ -106,7 +102,7 @@ def plot(read_end, stop, nChannelsInData, bufferLen):
 			else:
 				for i, buffer in enumerate(buffers):
 					buffer.append(data[:,i])
-			
+
 			#send all the data (that now includes the new
 			#data we recieved above ) to matplotlib. Do
 			#this for every plot
@@ -116,7 +112,7 @@ def plot(read_end, stop, nChannelsInData, bufferLen):
 
 			#update the view
 			updateLivePlot(cachedPlotData,ax, fig, lines)
-			
+
 		#give matplotlib time to check if the user has zoomed in 
 		#or done other things with the interface
 		plt.pause(0.000000000001)

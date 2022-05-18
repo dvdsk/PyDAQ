@@ -168,7 +168,7 @@ class WriteTask(Task):
 def startReadOnly(input_write_ends, stop, rdy,
 	              inputChannel, samplerate, maxMeasure, minMeasure):
 	sampswritten = int32()
-	
+
 	if(len(input_write_ends) == 1):
 		readInTask= ReadToOnePipe(input_write_ends[0], inputChannel, samplerate, maxMeasure, minMeasure)
 	else: #its 2
@@ -187,10 +187,10 @@ def startReadOnly(input_write_ends, stop, rdy,
 	#shutdown routine
 	readInTask.StopTask()
 	readInTask.ClearTask()
-	if(isinstance(inputChannel, list)):
+	if (isinstance(inputChannel, list)):
 		print(", ".join(inputChannel, )+": closed")
 	else:
-		print(inputChannel+": closed")
+		print(f"{inputChannel}: closed")
 
 def startGenOnly(output_read_end, stop, rdy, outputChannels,
 				 outputShape, samplerate, maxMeasure, minMeasure):
@@ -206,7 +206,7 @@ def startGenOnly(output_read_end, stop, rdy, outputChannels,
 	writeInTask.StartTask()
 	print("started gen")
 	rdy.set()
-	
+
 	#every second check if the output should change
 	while(not stop.wait(1)):
 		if(output_read_end.poll()):
@@ -239,10 +239,10 @@ def startGenOnly(output_read_end, stop, rdy, outputChannels,
 
 	writeInTask.StopTask()
 	writeInTask.ClearTask()
-	if(isinstance(outputChannels, list)):
+	if (isinstance(outputChannels, list)):
 		print(", ".join(outputChannels, )+": closed and reset to 0 volt")
 	else:
-		print(outputChannels+": closed and reset to 0 volt")
+		print(f"{outputChannels}: closed and reset to 0 volt")
 
 def startReadAndGen(input_write_ends, output_read_end, stop, rdy, outputChannels,
 	                outputShape, inputChannel, samplerate, maxMeasure, minMeasure):
@@ -251,9 +251,9 @@ def startReadAndGen(input_write_ends, output_read_end, stop, rdy, outputChannels
 		readInTask= ReadToOnePipe(input_write_ends[0], inputChannel, samplerate, maxMeasure[0], minMeasure[0])
 	else: #its 2
 		readInTask= ReadToTwoPipes(input_write_ends[0], input_write_ends[1], inputChannel, samplerate, maxMeasure[0], minMeasure[0])
-		
+
 	writeInTask=WriteTask(outputChannels, outputShape, samplerate, maxMeasure[1], minMeasure[1])
-	
+
 	if(readInTask.rdy == False or writeInTask.rdy == False):
 		print("errors detected, not starting generation nor readout!!")
 		stop.set()
@@ -263,7 +263,7 @@ def startReadAndGen(input_write_ends, output_read_end, stop, rdy, outputChannels
 	readInTask.StartTask()
 	writeInTask.StartTask()
 	rdy.set()
-	
+
 	#every second check if the output should change
 	while(not stop.wait(1)):
 		if(output_read_end.poll()):
@@ -296,7 +296,7 @@ def startReadAndGen(input_write_ends, output_read_end, stop, rdy, outputChannels
 	writeInTask.StopTask()
 	readInTask.ClearTask()
 	writeInTask.ClearTask()
-	
+
 	if(isinstance(outputChannels, list)):
 		outChannString = ", ".join(outputChannels)
 	else:
@@ -305,4 +305,6 @@ def startReadAndGen(input_write_ends, output_read_end, stop, rdy, outputChannels
 		inputChannString = ", ".join(inputChannel)
 	else:
 		inputChannString = inputChannel
-	print(inputChannString+": closed, "+outChannString+": closed and reset to 0 volt")
+	print(
+	    f"{inputChannString}: closed, {outChannString}: closed and reset to 0 volt"
+	)
